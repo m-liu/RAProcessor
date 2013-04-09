@@ -8,3 +8,16 @@ uint32_t globalNextMeta = 0;
 uint32_t globalNextAddr = 0;
 
 
+/*
+uint32_t getNextMeta (){
+	uint32_t curr = globalNextMeta;
+	globalNextMeta++;
+	return curr;
+}
+
+uint32_t getNextAddr (TableMetaEntry tableMeta){
+	uint32_t curr = globalNextAddr;
+	globalNextAddr = globalNextAddr + tableMeta.numRows;
+	return curr;
+}
+*/

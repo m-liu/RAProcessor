@@ -9,7 +9,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string.h>
-
+#include <assert.h>
 #include <stdint.h> 
 
 #include "globalTypes.h"
@@ -31,7 +31,7 @@ TableMetaEntry findTableMetadata (char *tableName) {
             return globalTableMeta[i];
         }
     }
-	printf("ERROR: cannot find table %s in metadata\n");
+	printf("ERROR: cannot find table %s in metadata\n", tableName);
 	exit (EXIT_FAILURE);
 }
 
@@ -49,7 +49,6 @@ SelClause getClause (char *col1, char *op, char *col2_or_val, TableMetaEntry tab
     SelClause clause;
     long int val;
     char *pEnd;
-    int offset = 0;
 
     //fill in the common stuff
 	clause.colOffset0 = getColOffset(col1, tableMeta);
@@ -106,29 +105,40 @@ void dumpTableMetas(){
 
 void dumpCmdEntry (CmdEntry cmdEntry){
     printf("\ncmdEntry.op=%d\n", cmdEntry.op);
-    printf("cmdEntry.table0Addr=%d\n", cmdEntry.table0Addr);
-    printf("cmdEntry.table0numRows=%d\n", cmdEntry.table0numRows);
-    printf("cmdEntry.table0numCols=%d\n", cmdEntry.table0numCols);
-    printf("---SELECT---\n");
-    for (uint32_t c=0; c<cmdEntry.numClauses; c++){
-        SelClause cl = cmdEntry.clauses[c];
-        printf("clause %d: ", c);
-		if (cl.clauseType==COL_COL){
-	        printf("type: COL_COL "); 
-		}
-		else if (cl.clauseType==COL_VAL){
-			printf("type: COL_VAL ");
-		}	
-        printf("colOffset0:%d, op:%d, val:%d, colOffset1:%d\n", cl.colOffset0, cl.op, 
-				cl.val, cl.colOffset1);
-        if (c < cmdEntry.numClauses-1) {
-			if (cmdEntry.con[c] == AND) {
-	            printf("clausecon %d: AND\n", c);
-			} else if (cmdEntry.con[c] == OR) {
-	            printf("clausecon %d: OR\n", c);
+    printf("cmdEntry input table #0: %d rows x %d cols @ addr=%d\n", cmdEntry.table0numRows, cmdEntry.table0numCols, cmdEntry.table0Addr);
+	printf("cmdEntry output table addr=%d\n", cmdEntry.outputAddr);
+
+	if (cmdEntry.op == SELECT){
+		printf("---SELECT---\n");
+		for (uint32_t c=0; c<cmdEntry.numClauses; c++){
+			SelClause cl = cmdEntry.clauses[c];
+			printf("clause %d: ", c);
+			if (cl.clauseType==COL_COL){
+				printf("type: COL_COL "); 
 			}
-        }
-    }
+			else if (cl.clauseType==COL_VAL){
+				printf("type: COL_VAL ");
+			}	
+			printf("colOffset0:%d, op:%d, val:%lu, colOffset1:%d\n", cl.colOffset0, cl.op, 
+					cl.val, cl.colOffset1);
+			if (c < cmdEntry.numClauses-1) {
+				if (cmdEntry.con[c] == AND) {
+					printf("clausecon %d: AND\n", c);
+				} else if (cmdEntry.con[c] == OR) {
+					printf("clausecon %d: OR\n", c);
+				}
+			}
+		}
+	}
+	else if (cmdEntry.op == PROJECT){
+		printf("---PROJECT---\n");
+		printf("projectMask = %x\n", cmdEntry.colProjectMask);
+	}
+	else if (cmdEntry.op == UNION || cmdEntry.op == DIFFERENCE || cmdEntry.op == XPROD){
+		printf("---UNION/DIFF/XPROD---");
+    	printf("cmdEntry input table #1: %d rows x %d cols @ addr=%d\n", cmdEntry.table1numRows, cmdEntry.table1numCols, cmdEntry.table1Addr);
+	}
+
 	printf("------------------------\n\n");
 }
 
@@ -150,11 +160,7 @@ CmdEntry parseSelect (char cmdTokens[][MAX_CHARS], int numTokens){
     globalTableMeta[globalNextMeta] = tableMeta; //use input as base
     strcpy( globalTableMeta[globalNextMeta].tableName, cmdTokens[2] );
     globalTableMeta[globalNextMeta].startAddr = globalNextAddr;
-
-    globalNextMeta++;
-    globalNextAddr = globalNextAddr + tableMeta.numRows; 
-
-
+	
     int c=0;
     int ntok=3; //parse the clauses, start at ind=3
 
@@ -177,12 +183,17 @@ CmdEntry parseSelect (char cmdTokens[][MAX_CHARS], int numTokens){
         }
         c++;
     }
+
     cmdEntry.numClauses=c;
-    
+	cmdEntry.outputAddr = globalTableMeta[globalNextMeta].startAddr;
     cmdEntry.op = SELECT;
     cmdEntry.table0Addr = tableMeta.startAddr;
     cmdEntry.table0numRows = tableMeta.numRows;
     cmdEntry.table0numCols = tableMeta.numCols;
+
+	//increment global pointers
+	globalNextAddr = globalNextAddr + globalTableMeta[globalNextMeta].numRows;
+    globalNextMeta++;
 
 	dumpCmdEntry (cmdEntry);
     return cmdEntry;
@@ -191,34 +202,150 @@ CmdEntry parseSelect (char cmdTokens[][MAX_CHARS], int numTokens){
 CmdEntry parseProject (char cmdTokens[][MAX_CHARS], int numTokens){
     printf("parsing PROJECT...\n");
     CmdEntry cmdEntry;
-    TableMetaEntry tableMeta = findTableMetadata(cmdTokens[1]);
-	uint32_t mask = 0; 
+ 
+ 	TableMetaEntry tableMeta = findTableMetadata(cmdTokens[1]);
 
-	/*
+	//Output table metadata
+	//TODO this assumes largest possible table size as output
+    globalTableMeta[globalNextMeta] = tableMeta; //use input as base
+    strcpy( globalTableMeta[globalNextMeta].tableName, cmdTokens[2] );
+    globalTableMeta[globalNextMeta].startAddr = globalNextAddr;
+	
+	uint32_t mask = 0; 
+	int ntok = 3;
+	uint32_t colOffset=0;
+	int c=0;
+	
 	//look up all the column names, and convert them to a one-hot encoding mask
 	while (ntok < numTokens) {
-		
+		colOffset=getColOffset(cmdTokens[ntok], tableMeta);
+		assert(colOffset < MAX_COLS);
+		mask = mask | (1<<colOffset);
 
-	}*/
+		//update metadata: column names and numCols have changed
+		strcpy(globalTableMeta[globalNextMeta].colNames[c], cmdTokens[ntok]);
 
+		c++;
+		ntok++;
+	}
+	//update numCols
+	globalTableMeta[globalNextMeta].numCols = c;
 
-	//TODO this assumes largest possible table size as output
+	cmdEntry.outputAddr = globalTableMeta[globalNextMeta].startAddr;
+	cmdEntry.colProjectMask = mask;
+	cmdEntry.op = PROJECT;
+    cmdEntry.table0Addr = tableMeta.startAddr;
+    cmdEntry.table0numRows = tableMeta.numRows;
+    cmdEntry.table0numCols = tableMeta.numCols;
 	
+	//update global pointers TODO make these functions
+	globalNextAddr = globalNextAddr + globalTableMeta[globalNextMeta].numRows;
+    globalNextMeta++;
+	
+	dumpCmdEntry (cmdEntry);
+	return cmdEntry;
 	
 }
 
 CmdEntry parseUnion (char cmdTokens[][MAX_CHARS], int numTokens){
     printf("parsing UNION...\n");
     CmdEntry cmdEntry;
+ 	
+	TableMetaEntry tableMeta0 = findTableMetadata(cmdTokens[1]);
+	TableMetaEntry tableMeta1 = findTableMetadata(cmdTokens[2]);
+
+	//output table metadata
+	globalTableMeta[globalNextMeta] = tableMeta0; //use as base
+    strcpy( globalTableMeta[globalNextMeta].tableName, cmdTokens[3] );
+	globalTableMeta[globalNextMeta].startAddr = globalNextAddr;
+	//# rows is sum of both (worst case)
+	globalTableMeta[globalNextMeta].numRows = tableMeta0.numRows + tableMeta1.numRows; 
+	
+	cmdEntry.outputAddr = globalTableMeta[globalNextMeta].startAddr;
+	cmdEntry.op = UNION;
+    cmdEntry.table0Addr = tableMeta0.startAddr;
+    cmdEntry.table0numRows = tableMeta0.numRows;
+    cmdEntry.table0numCols = tableMeta0.numCols;
+    cmdEntry.table1Addr = tableMeta1.startAddr;
+    cmdEntry.table1numRows = tableMeta1.numRows;
+    cmdEntry.table1numCols = tableMeta1.numCols;
+
+	//increment global pointers
+	globalNextAddr = globalNextAddr + globalTableMeta[globalNextMeta].numRows;
+	globalNextMeta++;
+	
+	dumpCmdEntry (cmdEntry);
+	return cmdEntry;
+
 }
 
 CmdEntry parseDifference (char cmdTokens[][MAX_CHARS], int numTokens){
     printf("parsing DIFFERENCE...\n");
+    CmdEntry cmdEntry;
+
+	TableMetaEntry tableMeta0 = findTableMetadata(cmdTokens[1]);
+	TableMetaEntry tableMeta1 = findTableMetadata(cmdTokens[2]);
+
+	//output table metadata
+	//# rows is at most the num of rows in table0 (worst case)
+	globalTableMeta[globalNextMeta] = tableMeta0; //use as base
+    strcpy( globalTableMeta[globalNextMeta].tableName, cmdTokens[3] );
+	globalTableMeta[globalNextMeta].startAddr = globalNextAddr;
+	
+	cmdEntry.outputAddr = globalTableMeta[globalNextMeta].startAddr;
+	cmdEntry.op = DIFFERENCE;
+    cmdEntry.table0Addr = tableMeta0.startAddr;
+    cmdEntry.table0numRows = tableMeta0.numRows;
+    cmdEntry.table0numCols = tableMeta0.numCols;
+    cmdEntry.table1Addr = tableMeta1.startAddr;
+    cmdEntry.table1numRows = tableMeta1.numRows;
+    cmdEntry.table1numCols = tableMeta1.numCols;
+
+	//increment global pointers
+	globalNextAddr = globalNextAddr + globalTableMeta[globalNextMeta].numRows;
+	globalNextMeta++;
+	
+	dumpCmdEntry (cmdEntry);
+	return cmdEntry;
 }
 
 
 CmdEntry parseXprod (char cmdTokens[][MAX_CHARS], int numTokens){
     printf("parsing XPROD...\n");
+    CmdEntry cmdEntry;
+
+	TableMetaEntry tableMeta0 = findTableMetadata(cmdTokens[1]);
+	TableMetaEntry tableMeta1 = findTableMetadata(cmdTokens[2]);
+
+	//output table metadata
+	globalTableMeta[globalNextMeta] = tableMeta0; //use as base
+    strcpy( globalTableMeta[globalNextMeta].tableName, cmdTokens[3] );
+	globalTableMeta[globalNextMeta].startAddr = globalNextAddr;
+	//# rows is at most the nrows table0 x nrows table1 (worst case)
+	globalTableMeta[globalNextMeta].numRows = tableMeta0.numRows * tableMeta1.numRows;
+	//# cols is ncols table0 + ncols table1
+	globalTableMeta[globalNextMeta].numCols = tableMeta0.numCols + tableMeta1.numCols;
+	//append table1's column names
+	for(uint32_t i=0; i<tableMeta1.numCols; i++){
+		strcpy( globalTableMeta[globalNextMeta].colNames[i+tableMeta0.numCols], tableMeta1.colNames[i] );
+	}
+
+	
+	cmdEntry.outputAddr = globalTableMeta[globalNextMeta].startAddr;
+	cmdEntry.op = XPROD;
+    cmdEntry.table0Addr = tableMeta0.startAddr;
+    cmdEntry.table0numRows = tableMeta0.numRows;
+    cmdEntry.table0numCols = tableMeta0.numCols;
+    cmdEntry.table1Addr = tableMeta1.startAddr;
+    cmdEntry.table1numRows = tableMeta1.numRows;
+    cmdEntry.table1numCols = tableMeta1.numCols;
+
+	//increment global pointers
+	globalNextAddr = globalNextAddr + globalTableMeta[globalNextMeta].numRows;
+	globalNextMeta++;
+	
+	dumpCmdEntry (cmdEntry);
+	return cmdEntry;
 }
 
 

@@ -44,6 +44,7 @@ struct CmdEntry {
     uint32_t table0Addr;
     uint32_t table0numRows;
     uint32_t table0numCols;
+    uint32_t outputAddr; //Addr for output table
 
     //Select
     uint32_t numClauses;
@@ -58,8 +59,6 @@ struct CmdEntry {
     uint32_t table1numRows;
     uint32_t table1numCols;
 
-    //Addr to store output table
-    uint32_t outputAddr;
 
 };
 
@@ -69,5 +68,11 @@ extern TableMetaEntry globalTableMeta[MAX_TABLES];
 extern uint32_t globalNextMeta;
 extern uint32_t globalNextAddr;
 
+
+//Global access functions
+/*
+uint32_t getNextMeta ();
+uint32_t getNextAddr (TableMetaEntry tableMeta);
+*/
 
 #endif //GLOBAL_TYPES_H
