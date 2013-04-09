@@ -19,14 +19,12 @@ int main(int argc, char* argv[]){
 
 	char* csv = argv[1];
 
-	
-	if ( !parsecsv(csv, globalNextMeta, globalNextAddr) ) {
+	printf("\nReading the CSV files in directory ./input/.........\n");
+	if ( !parsecsv() ) {
 		fprintf(stderr, "MemInit Unsuccessful\n");
 	}
-	else{ //successful, increment global pointers
-		printTable(globalNextMeta);
-		globalNextAddr = globalNextAddr + globalTableMeta[globalNextMeta].numRows;
-		globalNextMeta++;
+	else{
+	  printf("CSV files Read Successful, Memory Initialized!...........\n\n");
 	}
 
 	CmdEntry cmdEntryBuff[MAX_NUM_CMDS];
