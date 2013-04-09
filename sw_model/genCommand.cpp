@@ -105,7 +105,7 @@ void dumpTableMetas(){
 
 void dumpCmdEntry (CmdEntry cmdEntry){
     printf("\ncmdEntry.op=%d\n", cmdEntry.op);
-    printf("cmdEntry input table #0: %d rows x %d cols @ addr=%d\n", cmdEntry.table0numRows, cmdEntry.table0numCols, cmdEntry.table0Addr);
+    printf("cmdEntry 1st input table: %d rows x %d cols @ addr=%d\n", cmdEntry.table0numRows, cmdEntry.table0numCols, cmdEntry.table0Addr);
 	printf("cmdEntry output table addr=%d\n", cmdEntry.outputAddr);
 
 	if (cmdEntry.op == SELECT){
@@ -135,8 +135,8 @@ void dumpCmdEntry (CmdEntry cmdEntry){
 		printf("projectMask = %x\n", cmdEntry.colProjectMask);
 	}
 	else if (cmdEntry.op == UNION || cmdEntry.op == DIFFERENCE || cmdEntry.op == XPROD){
-		printf("---UNION/DIFF/XPROD---");
-    	printf("cmdEntry input table #1: %d rows x %d cols @ addr=%d\n", cmdEntry.table1numRows, cmdEntry.table1numCols, cmdEntry.table1Addr);
+		printf("---UNION/DIFF/XPROD---\n");
+    	printf("cmdEntry 2nd input table: %d rows x %d cols @ addr=%d\n", cmdEntry.table1numRows, cmdEntry.table1numCols, cmdEntry.table1Addr);
 	}
 
 	printf("------------------------\n\n");
@@ -195,7 +195,7 @@ CmdEntry parseSelect (char cmdTokens[][MAX_CHARS], int numTokens){
 	globalNextAddr = globalNextAddr + globalTableMeta[globalNextMeta].numRows;
     globalNextMeta++;
 
-	dumpCmdEntry (cmdEntry);
+	//dumpCmdEntry (cmdEntry);
     return cmdEntry;
 }
 
@@ -242,7 +242,7 @@ CmdEntry parseProject (char cmdTokens[][MAX_CHARS], int numTokens){
 	globalNextAddr = globalNextAddr + globalTableMeta[globalNextMeta].numRows;
     globalNextMeta++;
 	
-	dumpCmdEntry (cmdEntry);
+	//dumpCmdEntry (cmdEntry);
 	return cmdEntry;
 	
 }
@@ -274,7 +274,7 @@ CmdEntry parseUnion (char cmdTokens[][MAX_CHARS], int numTokens){
 	globalNextAddr = globalNextAddr + globalTableMeta[globalNextMeta].numRows;
 	globalNextMeta++;
 	
-	dumpCmdEntry (cmdEntry);
+	//dumpCmdEntry (cmdEntry);
 	return cmdEntry;
 
 }
@@ -305,7 +305,7 @@ CmdEntry parseDifference (char cmdTokens[][MAX_CHARS], int numTokens){
 	globalNextAddr = globalNextAddr + globalTableMeta[globalNextMeta].numRows;
 	globalNextMeta++;
 	
-	dumpCmdEntry (cmdEntry);
+	//dumpCmdEntry (cmdEntry);
 	return cmdEntry;
 }
 
@@ -344,7 +344,7 @@ CmdEntry parseXprod (char cmdTokens[][MAX_CHARS], int numTokens){
 	globalNextAddr = globalNextAddr + globalTableMeta[globalNextMeta].numRows;
 	globalNextMeta++;
 	
-	dumpCmdEntry (cmdEntry);
+	//dumpCmdEntry (cmdEntry);
 	return cmdEntry;
 }
 
@@ -356,22 +356,23 @@ CmdEntry parseXprod (char cmdTokens[][MAX_CHARS], int numTokens){
 // genCommand produces and returns  the final command struct
 //************************************************************
 
-
-//CmdOp genCommand () {
-void genCommand() {
-    FILE *cmdFile = fopen("input/commands.txt", "r"); 
+//returns how many commands it got
+uint32_t genCommand(const char *cmdFilePath, CmdEntry *cmdEntryBuff) {
+    FILE *cmdFile = fopen(cmdFilePath, "r"); 
     char cmdLine[MAX_CHARS];
     char cmdTokens[MAX_CMD_TOKENS][MAX_CHARS];
     char op[MAX_CHARS];
     char *pch; 
     int i=0;
     int numTokens=0;
+	int cmdInd=0;
 
     if (cmdFile==NULL) {
         perror("error opening command file"); 
     }
 
     while( fgets(cmdLine, MAX_CHARS, cmdFile) != NULL ) {
+		assert (cmdInd < MAX_NUM_CMDS);
 
         i=0;
         //get rid of \n in cmdLine
@@ -395,28 +396,30 @@ void genCommand() {
         
         //parse each command based on the op
         if (strcmp(op, "SELECT") == 0){
-            parseSelect(cmdTokens, numTokens);
+            cmdEntryBuff[cmdInd] = parseSelect(cmdTokens, numTokens);
         }
         else if (strcmp(op, "PROJECT") == 0){
-            parseProject(cmdTokens, numTokens);
+            cmdEntryBuff[cmdInd] = parseProject(cmdTokens, numTokens);
         }
         else if (strcmp(op, "XPROD") == 0){
-            parseXprod(cmdTokens, numTokens);
+            cmdEntryBuff[cmdInd] = parseXprod(cmdTokens, numTokens);
         }
         else if (strcmp(op, "UNION") == 0){
-            parseUnion(cmdTokens, numTokens);
+            cmdEntryBuff[cmdInd] = parseUnion(cmdTokens, numTokens);
         }
         else if (strcmp(op, "DIFFERENCE") == 0){
-            parseDifference(cmdTokens, numTokens);
+            cmdEntryBuff[cmdInd] = parseDifference(cmdTokens, numTokens);
         }
         else {
             perror("Error: invalid op\n");
         }
-
+		
+		cmdInd++;
 
     }
 
     fclose(cmdFile); 
+	return cmdInd;
 }
 
 

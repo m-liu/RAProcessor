@@ -13,7 +13,7 @@
 
 int main(int argc, char* argv[]){
 	if (argc < 2) {
-		fprintf(stderr, "Input a csv file\n");
+		fprintf(stderr, "Input a command file\n");
 		return 1;
 	}
 
@@ -29,8 +29,13 @@ int main(int argc, char* argv[]){
 		globalNextMeta++;
 	}
 
-	genCommand();
+	CmdEntry cmdEntryBuff[MAX_NUM_CMDS];
 
+	uint32_t nCmds = genCommand("input/commands.txt", cmdEntryBuff);
+
+	for (uint32_t i=0; i<nCmds; i++){
+		dumpCmdEntry(cmdEntryBuff[i]);
+	}
 	dumpTableMetas();
 	return 0;
 }

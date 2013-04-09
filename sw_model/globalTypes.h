@@ -15,6 +15,7 @@
 #define MAX_CHARS 256
 #define MAX_TABLES 128
 #define MAX_CLAUSES 16
+#define MAX_NUM_CMDS 16
 
 struct TableMetaEntry {
     char tableName[MAX_CHARS];
@@ -26,7 +27,7 @@ struct TableMetaEntry {
 
 
 
-enum CmdOp {SELECT, PROJECT, XPROD, UNION, DIFFERENCE}; 
+enum CmdOp {SELECT, PROJECT, UNION, DIFFERENCE, XPROD}; 
 enum CompOp {EQ, LT, LE, GT, GE, NE}; 
 enum ClauseType {COL_COL, COL_VAL}; 
 enum ClauseCon {AND, OR}; 

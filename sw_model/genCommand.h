@@ -11,7 +11,7 @@
 #include <stdint.h> 
 
 
-void genCommand();
+uint32_t genCommand(const char *cmdFilePath, CmdEntry *cmdEntryBuff);
 
 void dumpCmdEntry(CmdEntry cmdEntry);
 void dumpTableMetas();
