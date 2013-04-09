@@ -1,0 +1,6 @@
+SELECT,roster,tableOut,id,<,100,AND,weight,>,scores
+SELECT,tableOut,tableOut2,gender,=,1
+PROJECT,tableOut,tableOut2,col0,col1,col2 
+UNION,table0,table1,tableOut3
+DIFFERENCE,table0,table1,tableOut4
+XPROD,table0,table1,tableOut5
