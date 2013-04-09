@@ -10,6 +10,7 @@
 
 void printTable(uint32_t tb_num);
 
+bool parsecsv();
 bool parsecsv(const char *filename, const uint32_t tb_num, const uint32_t start_addr);
 
 
