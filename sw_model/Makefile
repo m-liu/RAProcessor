@@ -1,4 +1,4 @@
-SOURCES=genCommand.cpp tableParser.cpp procTop.cpp globalTypes.cpp
+SOURCES=genCommand.cpp tableParser.cpp procTop.cpp globalTypes.cpp procModel.cpp procProject.cpp procSelect.cpp procUnionDiffXprod.cpp 
 EXECUTABLE=runProc
 
 CC=g++
