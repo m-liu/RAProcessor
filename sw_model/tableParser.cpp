@@ -92,7 +92,7 @@ void printTable(uint32_t tb_num){
   uint32_t nRows = globalTableMeta[tb_num].numRows;
   uint32_t nCols = globalTableMeta[tb_num].numCols;
   uint32_t addr_ptr = globalTableMeta[tb_num].startAddr;
-  cout << "\nColumn Names:\t";  
+  cout << "\nColumn Names:\n";  
   for (uint32_t i = 0; i < nCols; i++){
     cout << globalTableMeta[tb_num].colNames[i] << "\t";
   }
@@ -103,6 +103,7 @@ void printTable(uint32_t tb_num){
     }
     cout << endl;
   }
+    cout << "------" << endl;
 }
 
 bool parsecsv(){

@@ -9,7 +9,7 @@
 #include "globalTypes.h"
 #include "tableParser.h"
 #include "genCommand.h" 
-
+#include "procModel.h"
 
 int main(int argc, char* argv[]){
 	if (argc < 2) {
@@ -17,7 +17,7 @@ int main(int argc, char* argv[]){
 		return 1;
 	}
 
-	char* csv = argv[1];
+	char* cmdIn = argv[1];
 
 	printf("\nReading the CSV files in directory ./input/.........\n");
 	if ( !parsecsv() ) {
@@ -29,11 +29,20 @@ int main(int argc, char* argv[]){
 
 	CmdEntry cmdEntryBuff[MAX_NUM_CMDS];
 
-	uint32_t nCmds = genCommand("input/commands.txt", cmdEntryBuff);
+	uint32_t nCmds = genCommand(cmdIn, cmdEntryBuff);
+
+	runProcModel(cmdEntryBuff, nCmds);
 
 	for (uint32_t i=0; i<nCmds; i++){
 		dumpCmdEntry(cmdEntryBuff[i]);
 	}
 	dumpTableMetas();
+
+	printf("\n************************************\n");
+	printf("Final table values:\n");
+	for (uint32_t i=0; i<globalNextMeta; i++){
+		printTable(i);
+	}
+
 	return 0;
 }

@@ -14,8 +14,10 @@
 #define MAX_MEM_ROWS 4096
 #define MAX_CHARS 256
 #define MAX_TABLES 128
-#define MAX_CLAUSES 16
 #define MAX_NUM_CMDS 16
+#define MAX_CLAUSES 16
+#define MAX_AND_CLAUSES 4
+#define MAX_OR_CLAUSES (MAX_CLAUSES/MAX_AND_CLAUSES)
 
 struct TableMetaEntry {
     char tableName[MAX_CHARS];
