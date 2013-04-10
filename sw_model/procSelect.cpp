@@ -15,9 +15,11 @@ void doSelect (CmdEntry cmdEntry){
 
 	for (uint32_t memrow= cmdEntry.table0Addr; memrow < (cmdEntry.table0Addr+cmdEntry.table0numRows); memrow++){
 		//fill the row buffer
+		/*
 		for (uint32_t col=0; col < cmdEntry.table0numCols; col++){
 			rowBuff[col] = globalMem[memrow][col];
-		}
+		}*/
+		memcpy(rowBuff, globalMem[memrow], cmdEntry.table0numCols*sizeof(uint32_t));
 		
 		//evaluate all the clauses
 		bool qualify[MAX_CLAUSES];
@@ -135,6 +137,16 @@ void doSelect (CmdEntry cmdEntry){
 
 	}
 
-	//TODO update the command buffer with information on how many rows were selected
+	//update cmd buff
+	for (uint32_t cmdInd=0; cmdInd<globalNCmds; cmdInd++){
+		//if the output table of SELECT is the input to another command, then update the # of rows
+		if ( cmdEntry.outputAddr == globalCmdEntryBuff[cmdInd].table0Addr ){ 
+			globalCmdEntryBuff[cmdInd].table0numRows = rowAddrOut;
+		}
+		//do the same for the other input table
+		if ( cmdEntry.outputAddr == globalCmdEntryBuff[cmdInd].table1Addr ){
+			globalCmdEntryBuff[cmdInd].table1numRows = rowAddrOut;
+		}
+	}
 	//TODO map the clauses to the evaluators in software!
 }

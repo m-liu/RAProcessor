@@ -1,7 +1,7 @@
 SELECT,particles,tableOut,id,<,100,AND,weight,>,age,OR,sizex,<,20
 SELECT,tableOut,tableOut2,type,=,1
 PROJECT,particles,tableOutProj,id,sizez,age
-DEDUP,particles,particlesdedup
+DEDUP,duptable,deduptable
 UNION,tableOut,tableOut2,tableOutU
 DIFFERENCE,tableOut,tableOut2,tableOutD
 XPROD,tableOutProj,particles,tableOutX
