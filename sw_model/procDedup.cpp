@@ -1,6 +1,3 @@
-#ifndef PROC_MODEL_H
-#define PROC_MODEL_H
-
 #include <iostream>     
 #include <unistd.h>     
 #include <cmath>        
@@ -11,8 +8,12 @@
 
 #include "globalTypes.h"
 
-void runProcModel ();
+void doDedup (CmdEntry cmdEntry){
 
 
 
-#endif
+}
+
+
+
+

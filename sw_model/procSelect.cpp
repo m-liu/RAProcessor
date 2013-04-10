@@ -13,10 +13,10 @@ void doSelect (CmdEntry cmdEntry){
 	uint32_t rowBuff[MAX_COLS];
 	uint32_t rowAddrOut = 0; 
 
-	for (uint32_t row=0; row < cmdEntry.table0numRows; row++){
+	for (uint32_t memrow= cmdEntry.table0Addr; memrow < (cmdEntry.table0Addr+cmdEntry.table0numRows); memrow++){
 		//fill the row buffer
 		for (uint32_t col=0; col < cmdEntry.table0numCols; col++){
-			rowBuff[col] = globalMem[row][col];
+			rowBuff[col] = globalMem[memrow][col];
 		}
 		
 		//evaluate all the clauses

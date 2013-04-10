@@ -29,7 +29,7 @@ struct TableMetaEntry {
 
 
 
-enum CmdOp {SELECT, PROJECT, UNION, DIFFERENCE, XPROD}; 
+enum CmdOp {SELECT, PROJECT, UNION, DIFFERENCE, XPROD, DEDUP}; 
 enum CompOp {EQ, LT, LE, GT, GE, NE}; 
 enum ClauseType {COL_COL, COL_VAL}; 
 enum ClauseCon {AND, OR}; 
@@ -71,6 +71,8 @@ extern TableMetaEntry globalTableMeta[MAX_TABLES];
 extern uint32_t globalNextMeta;
 extern uint32_t globalNextAddr;
 
+extern CmdEntry globalCmdEntryBuff[MAX_NUM_CMDS];
+extern uint32_t globalNCmds;
 
 //Global access functions
 /*

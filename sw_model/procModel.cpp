@@ -10,6 +10,7 @@
 #include "procSelect.h"
 #include "procProject.h"
 #include "procUnionDiffXprod.h"
+#include "procDedup.h"
 
 //The SW RA Processor model
 //Input: command buffer
@@ -18,23 +19,26 @@
 // NO ACCESS TO ANY OTHER GLOBAL VARS!
 
 
-void runProcModel (CmdEntry *cmdEntryBuff, uint32_t nCmds){
-	for (uint32_t n=0; n<nCmds; n++){
-		switch (cmdEntryBuff[n].op){
+void runProcModel (){
+	for (uint32_t n=0; n<globalNCmds; n++){
+		switch (globalCmdEntryBuff[n].op){
 			case SELECT:
-				doSelect(cmdEntryBuff[n]);
+				doSelect(globalCmdEntryBuff[n]);
 				break;
 			case PROJECT:
-				doProject(cmdEntryBuff[n]);
+				doProject(globalCmdEntryBuff[n]);
 				break;
 			case UNION:
-				doUnion(cmdEntryBuff[n]);
+				doUnion(globalCmdEntryBuff[n]);
 				break;
 			case DIFFERENCE:
-				doDiff(cmdEntryBuff[n]);
+				doDiff(globalCmdEntryBuff[n]);
 				break;
 			case XPROD:
-				doXprod(cmdEntryBuff[n]);
+				doXprod(globalCmdEntryBuff[n]);
+				break;
+			case DEDUP:
+				doDedup(globalCmdEntryBuff[n]);
 				break;
 			default:
 				printf("ERROR: runProcModel: invalid command\n");

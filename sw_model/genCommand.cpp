@@ -349,6 +349,32 @@ CmdEntry parseXprod (char cmdTokens[][MAX_CHARS], int numTokens){
 }
 
 
+CmdEntry parseDedup (char cmdTokens[][MAX_CHARS], int numTokens){
+    printf("parsing DEDUP...\n");
+    CmdEntry cmdEntry;
+
+	TableMetaEntry tableMeta0 = findTableMetadata(cmdTokens[1]);
+
+	//Output table metadata; rows/cols the same as input table (worst case)
+	globalTableMeta[globalNextMeta] = tableMeta0; //use as base
+    strcpy( globalTableMeta[globalNextMeta].tableName, cmdTokens[2] );
+	globalTableMeta[globalNextMeta].startAddr = globalNextAddr;
+
+	
+	cmdEntry.outputAddr = globalTableMeta[globalNextMeta].startAddr;
+	cmdEntry.op = DEDUP;
+    cmdEntry.table0Addr = tableMeta0.startAddr;
+    cmdEntry.table0numRows = tableMeta0.numRows;
+    cmdEntry.table0numCols = tableMeta0.numCols;
+
+
+	//increment global pointers
+	globalNextAddr = globalNextAddr + globalTableMeta[globalNextMeta].numRows;
+	globalNextMeta++;
+
+	return cmdEntry;
+
+}
 
 
 
@@ -410,6 +436,9 @@ uint32_t genCommand(const char *cmdFilePath, CmdEntry *cmdEntryBuff) {
         else if (strcmp(op, "DIFFERENCE") == 0){
             cmdEntryBuff[cmdInd] = parseDifference(cmdTokens, numTokens);
         }
+		else if (strcmp(op, "DEDUP") == 0){
+            cmdEntryBuff[cmdInd] = parseDedup(cmdTokens, numTokens);
+		}
         else {
             perror("Error: invalid op\n");
         }

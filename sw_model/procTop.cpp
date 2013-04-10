@@ -27,14 +27,19 @@ int main(int argc, char* argv[]){
 	  printf("CSV files Read Successful, Memory Initialized!...........\n\n");
 	}
 
-	CmdEntry cmdEntryBuff[MAX_NUM_CMDS];
 
-	uint32_t nCmds = genCommand(cmdIn, cmdEntryBuff);
+	globalNCmds = genCommand(cmdIn, globalCmdEntryBuff);
 
-	runProcModel(cmdEntryBuff, nCmds);
+	printf("command dump BEFORE execution:\n");
+	for (uint32_t i=0; i<globalNCmds; i++){
+		dumpCmdEntry(globalCmdEntryBuff[i]);
+	}
 
-	for (uint32_t i=0; i<nCmds; i++){
-		dumpCmdEntry(cmdEntryBuff[i]);
+	runProcModel();
+
+	printf("command dump AFTER execution:\n");
+	for (uint32_t i=0; i<globalNCmds; i++){
+		dumpCmdEntry(globalCmdEntryBuff[i]);
 	}
 	dumpTableMetas();
 
