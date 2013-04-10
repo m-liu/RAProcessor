@@ -86,7 +86,7 @@ void doDiff (CmdEntry cmdEntry){
     }
     
   }
-  updateCmdEntryBuff(outputAddr, t0_numRows+mismatch_cnt);
+  updateCmdEntryBuff(outputAddr, mismatch_cnt);
   
 }
 
