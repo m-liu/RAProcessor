@@ -11,7 +11,7 @@
 #include <stdint.h> 
 
 #define MAX_COLS 32
-#define MAX_MEM_ROWS 4096
+#define MAX_MEM_ROWS (1<<16)
 #define MAX_CHARS 256
 #define MAX_TABLES 128
 #define MAX_NUM_CMDS 16

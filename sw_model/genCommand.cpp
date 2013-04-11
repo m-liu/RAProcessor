@@ -225,7 +225,7 @@ CmdEntry parseProject (char cmdTokens[][MAX_CHARS], int numTokens){
 	uint32_t mask = 0; 
 	int ntok = 3;
 	uint32_t colOffset=0;
-	int c=0;
+	uint32_t c=0; 
 	
 	//look up all the column names, and convert them to a one-hot encoding mask
 	while (ntok < numTokens) {
@@ -234,11 +234,21 @@ CmdEntry parseProject (char cmdTokens[][MAX_CHARS], int numTokens){
 		mask = mask | (1<<colOffset);
 
 		//update metadata: column names and numCols have changed
-		strcpy(globalTableMeta[globalNextMeta].colNames[c], cmdTokens[ntok]);
-
+		strcpy(globalTableMeta[globalNextMeta].colNames[colOffset], cmdTokens[ntok]);
 		c++;
 		ntok++;
 	}
+	//compact the column names
+	uint32_t mask_tmp = mask;
+	uint32_t newInd = 0;
+	for (int i=0; i< MAX_COLS; i++){
+		if ( (mask_tmp & 0x1) == 1){
+			strcpy(globalTableMeta[globalNextMeta].colNames[newInd], globalTableMeta[globalNextMeta].colNames[i]);
+			newInd++;
+		}
+		mask_tmp = mask_tmp >> 1;
+	}
+
 	//update numCols
 	globalTableMeta[globalNextMeta].numCols = c;
 
