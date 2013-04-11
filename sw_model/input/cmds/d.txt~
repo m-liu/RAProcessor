@@ -1,0 +1,9 @@
+XPROD,works,located_in,tableOut0
+RENAME,tableOut0,3,company_name_1
+SELECT,tableOut0,tableOut1,company_name,=,company_name_1
+PROJECT,tableOut1,tableOut2,person_name,company_name,salary,city
+XPROD,tableOut2,lives,tableOut3
+RENAME,tableOut3,4,lives_person_name,6,lives_city
+SELECT,tableOut3,tableOut4,person_name,=,lives_person_name,city,=,lives_city
+PROJECT,tableOut4,tableOut5,person_name
+DEDUP,tableOut5,result

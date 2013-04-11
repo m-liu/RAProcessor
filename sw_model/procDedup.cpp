@@ -34,18 +34,20 @@ void doDedup (CmdEntry cmdEntry){
 			memcpy( globalMem[addr], globalMem[memrow], cmdEntry.table0numCols*sizeof(uint32_t) );
 		}
 
-		//update cmd buff
-		for (uint32_t cmdInd=0; cmdInd<globalNCmds; cmdInd++){
-			//if the output table of DEDUP is the input to another command, then update the # of rows
-			if ( cmdEntry.outputAddr == globalCmdEntryBuff[cmdInd].table0Addr ){ 
-				globalCmdEntryBuff[cmdInd].table0numRows = rowAddrOut;
-			}
-			//do the same for the other input table
-			if ( cmdEntry.outputAddr == globalCmdEntryBuff[cmdInd].table1Addr ){
-				globalCmdEntryBuff[cmdInd].table1numRows = rowAddrOut;
-			}
-		}
+		
 
+	}
+	//printf("\nAFTER DEDUP: from %d to %d\n",cmdEntry.table0numRows, rowAddrOut);
+	//update cmd buff
+	for (uint32_t cmdInd=0; cmdInd<globalNCmds; cmdInd++){
+	  //if the output table of DEDUP is the input to another command, then update the # of rows
+	  if ( cmdEntry.outputAddr == globalCmdEntryBuff[cmdInd].table0Addr ){ 
+	    globalCmdEntryBuff[cmdInd].table0numRows = rowAddrOut;
+	  }
+	  //do the same for the other input table
+	  if ( cmdEntry.outputAddr == globalCmdEntryBuff[cmdInd].table1Addr ){
+	    globalCmdEntryBuff[cmdInd].table1numRows = rowAddrOut;
+	  }
 	}
 }
 

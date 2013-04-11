@@ -1,0 +1,9 @@
+SELECT,located_in,tableOut0,company_name,=,120
+PROJECT,tableOut0,tableOut1,city
+PROJECT,located_in,tableOut2,company_name
+DEDUP,tableOut2,tableOut3
+XPROD,tableOut3,tableOut1,tableOut4
+DIFFERENCE,tableOut4,located_in,tableOut5
+PROJECT,tableOut5,tableOut6,company_name
+DEDUP,tableOut6,tableOut7
+DIFFERENCE,tableOut3,tableOut7,result

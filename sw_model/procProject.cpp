@@ -30,7 +30,7 @@ void doProject (CmdEntry cmdEntry){
   for (uint32_t i = 0; i < globalNCmds; i++){
     if ( globalCmdEntryBuff[i].table0Addr == outputAddr)
       globalCmdEntryBuff[i].table0numRows = rows;
-    if ( globalCmdEntryBuff[i].table0Addr == outputAddr)
+    if ( globalCmdEntryBuff[i].table1Addr == outputAddr)
       globalCmdEntryBuff[i].table1numRows = rows;
   }
 }
