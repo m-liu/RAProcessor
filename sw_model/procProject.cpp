@@ -9,6 +9,7 @@
 #include "globalTypes.h"
 
 
+
 void doProject (CmdEntry cmdEntry){
   uint32_t inputAddr = cmdEntry.table0Addr;
   uint32_t outputAddr = cmdEntry.outputAddr;
@@ -17,6 +18,7 @@ void doProject (CmdEntry cmdEntry){
   uint32_t mask = cmdEntry.colProjectMask;
   uint32_t outputColOffset;
 
+  //printf("PROJECT numRows: %d", rows);
   for (uint32_t i = 0; i < rows; i++){
     outputColOffset = 0;
     for (uint32_t j = 0; j < cols; j++){    
@@ -24,6 +26,11 @@ void doProject (CmdEntry cmdEntry){
 	globalMem[outputAddr+i][outputColOffset++] = globalMem[inputAddr+i][j];
     }
   }
-	
   
+  for (uint32_t i = 0; i < globalNCmds; i++){
+    if ( globalCmdEntryBuff[i].table0Addr == outputAddr)
+      globalCmdEntryBuff[i].table0numRows = rows;
+    if ( globalCmdEntryBuff[i].table0Addr == outputAddr)
+      globalCmdEntryBuff[i].table1numRows = rows;
+  }
 }

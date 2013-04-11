@@ -1,0 +1,3 @@
+SELECT,works,table_temp,company_name,=,911
+PROJECT,table_temp,result_temp,person_name
+DEDUP,result_temp, result
