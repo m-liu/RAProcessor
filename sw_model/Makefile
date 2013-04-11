@@ -2,7 +2,7 @@ SOURCES=genCommand.cpp tableParser.cpp procTop.cpp globalTypes.cpp procModel.cpp
 EXECUTABLE=runProc
 
 CC=g++
-CFLAGS=-c -Wall
+CFLAGS=-c -Wall -g
 LDFLAGS=
 
 BuildDir=build/

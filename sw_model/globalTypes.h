@@ -29,7 +29,7 @@ struct TableMetaEntry {
 
 
 
-enum CmdOp {SELECT, PROJECT, UNION, DIFFERENCE, XPROD, DEDUP}; 
+enum CmdOp {SELECT, PROJECT, UNION, DIFFERENCE, XPROD, DEDUP, RENAME}; 
 enum CompOp {EQ, LT, LE, GT, GE, NE}; 
 enum ClauseType {COL_COL, COL_VAL}; 
 enum ClauseCon {AND, OR}; 

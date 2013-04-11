@@ -35,6 +35,17 @@ TableMetaEntry findTableMetadata (char *tableName) {
 	exit (EXIT_FAILURE);
 }
 
+uint32_t findTableMetadataInd (char *tableName) {
+    for (int i=0; i<MAX_TABLES; i++){
+        if ( strncmp(globalTableMeta[i].tableName, tableName, MAX_CHARS) == 0 ){
+            return i;
+        }
+    }
+	printf("ERROR: cannot find table %s in metadata\n", tableName);
+	exit (EXIT_FAILURE);
+}
+
+
 uint32_t getColOffset (char *col, TableMetaEntry tableMeta){
 	for ( uint32_t offset=0; offset<MAX_COLS; offset++ ) {
 		if ( strcmp(tableMeta.colNames[offset], col) == 0 ) {
@@ -376,6 +387,21 @@ CmdEntry parseDedup (char cmdTokens[][MAX_CHARS], int numTokens){
 
 }
 
+void parseRename (char cmdTokens[][MAX_CHARS], int numTokens){
+    printf("parsing RENAME...\n");
+	
+	uint32_t tableMetaInd = findTableMetadataInd(cmdTokens[1]);
+	for (int i=2; i< numTokens; i=i+2){
+		int colInd = atoi(cmdTokens[i]);
+		if (colInd < (int)globalTableMeta[tableMetaInd].numCols) {
+			strcpy(globalTableMeta[tableMetaInd].colNames[colInd],cmdTokens[i+1]);
+		}
+		else {
+			printf("RENAME: column index out of bound. Table %s has %d cols\n", globalTableMeta[tableMetaInd].tableName, globalTableMeta[tableMetaInd].numCols);
+			exit(EXIT_FAILURE);
+		}
+	}
+}
 
 
 //************************************************************
@@ -439,6 +465,10 @@ uint32_t genCommand(const char *cmdFilePath, CmdEntry *cmdEntryBuff) {
 		else if (strcmp(op, "DEDUP") == 0){
             cmdEntryBuff[cmdInd] = parseDedup(cmdTokens, numTokens);
 		}
+		else if (strcmp(op, "RENAME") == 0){ //Not a command to the RA proc, just metadata change
+            parseRename(cmdTokens, numTokens);
+			cmdInd--; //do not increment cmdInd
+		}
         else {
             perror("Error: invalid op\n");
         }
@@ -448,6 +478,8 @@ uint32_t genCommand(const char *cmdFilePath, CmdEntry *cmdEntryBuff) {
     }
 
     fclose(cmdFile); 
+	printf("done genCommand\n");
+
 	return cmdInd;
 }
 

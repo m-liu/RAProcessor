@@ -5,3 +5,4 @@ DEDUP,duptable,deduptable
 UNION,tableOut,tableOut2,tableOutU
 DIFFERENCE,tableOut,tableOut2,tableOutD
 XPROD,tableOutProj,particles,tableOutX
+RENAME,tableOutX,0,id0,9,testrename
