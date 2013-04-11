@@ -1,8 +1,0 @@
-SELECT,works,tableOut0,company_name,=,911
-PROJECT,tableOut0,tableOut1,person_name
-DEDUP,tableOut1,tableOut2
-XPROD,tableOut2,lives
-RENAME,tableOut2,0,person_name_0
-SELECT,tableOut2,tableOut3,person_name_0,=,person_name
-PROJECT,tableOut3,tableOut4,person_name,city
-DEDUP,tableOut4,result

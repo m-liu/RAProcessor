@@ -1,8 +1,0 @@
-SELECT,works,tableOut0,company_name,=,911,AND,salary,>,100000
-PROJECT,tableOut0,tableOut1,person_name
-DEDUP,tableOut1,tableOut2
-XPROD,tableOut2,lives,tableOut3
-RENAME,tableOut3,0,person_name_0
-SELECT,tableOut3,tableOut4,person_name_0,=,person_name
-PROJECT,tableOut4,tableOut5,person_name,street,city
-DEDUP,tableOut5,result
