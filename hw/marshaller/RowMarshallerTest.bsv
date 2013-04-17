@@ -14,7 +14,7 @@ typedef enum { TEST_IDLE, TEST_REQ, TEST_WR, TEST_RD, TEST_DONE } TestState deri
 
 
 //typedef 3 SEL_OP;
-
+typedef 4 NUM_TESTS;
 
 module mkRowMarshallerTest();
 	DDR2_User ddrServer <- mkDDR2Simulator();
@@ -32,7 +32,7 @@ module mkRowMarshallerTest();
 	Reg#(Bit#(32)) someData <- mkReg(32'hDEADBEEF);
 
 	//Requests
-	Vector#(4, ROW_REQ) testReq = newVector();
+	Vector#(NUM_TESTS, ROW_REQ) testReq = newVector();
 	testReq[0] = ROW_REQ{ 	rowAddr: 23,
 						  	numRows: 3,
 							reqSrc: fromInteger(valueOf(SELECTION_BLK)),
@@ -54,14 +54,20 @@ module mkRowMarshallerTest();
 	//send some requests
 	let currReq = testReq[reqInd];
 	rule sendReqs if (state==TEST_IDLE);
-		$display("TB: sending req ind=%d", reqInd);
+		if (reqInd < fromInteger(valueOf(NUM_TESTS))) begin
+		
+			$display("TB: sending req ind=%d", reqInd);
 
-		marsh.rowAccesses[currReq.reqSrc].rowReq(currReq);
-		if (currReq.op ==WRITE) begin
-			state <= TEST_WR;
+			marsh.rowAccesses[currReq.reqSrc].rowReq(currReq);
+			if (currReq.op ==WRITE) begin
+				state <= TEST_WR;
+			end
+			else begin
+				state <= TEST_RD;
+			end
 		end
 		else begin
-			state <= TEST_RD;
+			$finish;
 		end
 	endrule
 

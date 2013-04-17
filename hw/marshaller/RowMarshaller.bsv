@@ -77,8 +77,8 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 	//Reg#(Bit#(16)) rowCounter <- mkReg(0); //counts up
 	Reg#(DDR2Address) ddrCounter <- mkReg(0);
 	Reg#(DDR2Address) ddrCounterOut <- mkReg(0);
-	Reg#(Bit#(4)) rburstCounter <- mkReg(0);
-	Reg#(Bit#(4)) wburstCounter <- mkReg(0);
+	Reg#(Bit#(32)) rburstCounter <- mkReg(0);
+	Reg#(Bit#(32)) wburstCounter <- mkReg(0);
 	Reg#(Bit#(256)) wdataBuff <- mkReg(0);
 
 	//********************
@@ -113,10 +113,14 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 	rule readDDR if (state == READ_DDR);
 		if (ddrCounterOut < ddrStopAddr) begin
 			Bit#(256) resp = ddrResp.first();
+			//$display("Marsh: ddr chunk: %x", resp);
 			//send out in 8 burst of 32 bits
 			if (rburstCounter < 8) begin
-				Bit#(256) resp_shift = resp >> rburstCounter;
-				dataOut[currReq.reqSrc].enq(truncate(resp_shift));
+				Bit#(256) resp_shift = resp << (rburstCounter<<5); //shift by 32
+				dataOut[currReq.reqSrc].enq(truncateLSB(resp_shift));
+				//$display("Marsh: ddr chunk shifted: %x", resp_shift);
+				Bit#(32) dataR = truncate(resp_shift);
+				//$display("Marsh: reading data %x, burstCount=%d", dataR, rburstCounter);
 				rburstCounter <= rburstCounter+1;
 			end
 			else begin	//done with bursting a DDR response
@@ -141,6 +145,7 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 				wburstCounter <= wburstCounter+1;
 			end
 			else begin
+				$display("Marsh: writing ddr data: %x", wdataBuff);
 				ddrReq.enq(DDR2Request{ writeen: 32'hFFFFFFFF,
 										address: ddrCounter,
 										datain: wdataBuff
