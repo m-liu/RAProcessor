@@ -6,6 +6,8 @@ import FIFOF::*;
 import Connectable::*;
 
 import RowMarshaller::*;
+import Selection::*;
+import OperatorCommon::*;
 import XilinxDDR2::*; 
 import DDR2::*;
 
@@ -16,9 +18,10 @@ typedef enum { TEST_IDLE, TEST_REQ, TEST_WR, TEST_RD, TEST_DONE } TestState deri
 //typedef 3 SEL_OP;
 typedef 4 NUM_TESTS;
 
-module mkRowMarshallerTest();
+module mkSelectionTest();
 	DDR2_User ddrServer <- mkDDR2Simulator();
 	ROW_MARSHALLER_IFC marsh <- mkRowMarshaller();
+	OPERATOR_IFC selection <- mkSelection(marsh.rowAccesses[valueOf(SELECTION_BLK)]);
 	
 	//connect ddr and marshaller
 	mkConnection(marsh.ddrMem, ddrServer);
@@ -30,26 +33,26 @@ module mkRowMarshallerTest();
 
 	//data
 	//Reg#(RowBurst) someData <- mkReg(32'hDEADBEEF);
-	Reg#(RowBurst) someData <- mkReg('hABCD5678DEADBEEF);
+	Reg#(RowBurst) someData <- mkReg('hDEADBEEF);
 
 	//Requests
 	Vector#(NUM_TESTS, RowReq) testReq = newVector();
 	testReq[0] = RowReq{ 	rowAddr: 23,
 						  	numRows: 3,
-							reqSrc: fromInteger(valueOf(SELECTION_BLK)),
+							reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
 							op: WRITE };
 	testReq[1] = RowReq{ 	rowAddr: 23,
 						  	numRows: 3,
-							reqSrc: fromInteger(valueOf(SELECTION_BLK)),
+							reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
 							op: READ };
 	
 	testReq[2] = RowReq{ 	rowAddr: 20,
 						  	numRows: 5,
-							reqSrc: fromInteger(valueOf(DEDUP_BLK)),
+							reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
 							op: WRITE };
 	testReq[3] = RowReq{ 	rowAddr: 20,
 						  	numRows: 5,
-							reqSrc: fromInteger(valueOf(DEDUP_BLK)),
+							reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
 							op: READ };
 
 	//send some requests

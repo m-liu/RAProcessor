@@ -22,24 +22,33 @@ typedef 4 PROJECTION_BLK;
 typedef 5 XPROD_BLK;
 typedef 6 DEDUP_BLK;
 
-typedef enum {READ, WRITE} Op deriving (Eq, Bits);
-typedef Bit#(32) ROW_BURST;
+typedef enum {READ, WRITE} MemOp deriving (Eq, Bits);
 
-typedef 32 MAX_COLS;
 typedef 7 NUM_MODULES;
-typedef 4 DDR_REQ_PER_ROW; //32 cols * 32 bits = 1024 bits; 1024/256 = 4
+typedef 32 BURST_WIDTH;
+typedef 32 COL_WIDTH;
+typedef 32 MAX_COLS;
+typedef 256 DDR_DATA_WIDTH;
+typedef TMul#(COL_WIDTH, MAX_COLS) ROW_BITS;
+typedef TDiv#(ROW_BITS, BURST_WIDTH) BURSTS_PER_ROW; //32
+typedef TDiv#(DDR_DATA_WIDTH, BURST_WIDTH) BURSTS_PER_DDR_DATA; //8
+typedef TDiv#(ROW_BITS, DDR_DATA_WIDTH) DDR_REQ_PER_ROW; //32 cols * 32 bits = 1024 bits; 1024/256 = 4
+
+typedef Bit#(31) RowAddr;
+typedef Bit#(BURST_WIDTH) RowBurst;
+typedef Bit#(TMul#(MAX_COLS,BURST_WIDTH)) Row; //32*32
 	
 typedef struct {
-	Bit#(31) rowAddr;
-	Bit#(31) numRows;
+	RowAddr rowAddr;
+	RowAddr numRows;
 	Bit#(4) reqSrc;
-	Op op;
-} ROW_REQ deriving (Eq,Bits);
+	MemOp op;
+} RowReq deriving (Eq,Bits);
 
 interface ROW_ACCESS_IFC;
-	method Action rowReq( ROW_REQ req);
-	method ActionValue#( ROW_BURST ) readResp();
-	method Action writeData ( ROW_BURST wData );
+	method Action rowReq( RowReq req);
+	method ActionValue#( RowBurst ) readResp();
+	method Action writeData ( RowBurst wData );
 endinterface
 
 interface ROW_MARSHALLER_IFC;
@@ -66,11 +75,11 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 	FIFO#(DDR2Response) ddrResp <- mkFIFO;
 
 	//all req enq into the same req fifo
-	FIFO#(ROW_REQ) rowReqQ <- mkFIFO;
+	FIFO#(RowReq) rowReqQ <- mkFIFO;
 
 	//separate data fifos for each module
-	Vector#(NUM_MODULES, FIFO#(ROW_BURST)) dataIn <- replicateM (mkFIFO);
-	Vector#(NUM_MODULES, FIFO#(ROW_BURST)) dataOut <- replicateM (mkFIFO);
+	Vector#(NUM_MODULES, FIFO#(RowBurst)) dataIn <- replicateM (mkFIFO);
+	Vector#(NUM_MODULES, FIFO#(RowBurst)) dataOut <- replicateM (mkFIFO);
 
 	Reg#(State) state <- mkReg(READY);
 
@@ -79,7 +88,7 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 	Reg#(DDR2Address) ddrCounterOut <- mkReg(0);
 	Reg#(Bit#(32)) rburstCounter <- mkReg(0);
 	Reg#(Bit#(32)) wburstCounter <- mkReg(0);
-	Reg#(Bit#(256)) wdataBuff <- mkReg(0);
+	Reg#(DDR2Data) wdataBuff <- mkReg(0);
 
 	//********************
 	//Rules
@@ -112,14 +121,14 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 
 	rule readDDR if (state == READ_DDR);
 		if (ddrCounterOut < ddrStopAddr) begin
-			Bit#(256) resp = ddrResp.first();
+			DDR2Data resp = ddrResp.first();
 			//$display("Marsh: ddr chunk: %x", resp);
 			//send out in 8 burst of 32 bits
-			if (rburstCounter < 8) begin
-				Bit#(256) resp_shift = resp << (rburstCounter<<5); //shift by 32
+			if (rburstCounter < fromInteger(valueOf(BURSTS_PER_DDR_DATA))) begin
+				DDR2Data resp_shift = resp << (rburstCounter<< valueOf(TLog#(BURST_WIDTH))); //shift by 32
 				dataOut[currReq.reqSrc].enq(truncateLSB(resp_shift));
 				//$display("Marsh: ddr chunk shifted: %x", resp_shift);
-				Bit#(32) dataR = truncate(resp_shift);
+				RowBurst dataR = truncate(resp_shift);
 				//$display("Marsh: reading data %x, burstCount=%d", dataR, rburstCounter);
 				rburstCounter <= rburstCounter+1;
 			end
@@ -138,10 +147,10 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 
 	rule reqWriteDDR if (state == WRITE_DDR);
 		if (ddrCounter < ddrStopAddr) begin
-			if (wburstCounter < 8) begin
+			if (wburstCounter < fromInteger(valueOf(BURSTS_PER_DDR_DATA))) begin
 				dataIn[currReq.reqSrc].deq();
 				//assemble write data
-				wdataBuff <= (wdataBuff<<32) | zeroExtend(dataIn[currReq.reqSrc].first());
+				wdataBuff <= (wdataBuff<< valueOf(BURST_WIDTH)) | zeroExtend(dataIn[currReq.reqSrc].first());
 				wburstCounter <= wburstCounter+1;
 			end
 			else begin
@@ -172,16 +181,16 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 	for (Integer moduleInd = 0; moduleInd < valueOf(NUM_MODULES); moduleInd=moduleInd+1) 
 	begin
 		rowAcc[moduleInd] =interface ROW_ACCESS_IFC; 
-							method Action rowReq ( ROW_REQ req );
+							method Action rowReq ( RowReq req );
 								rowReqQ.enq(req);
 							endmethod
 							
-							method ActionValue#( ROW_BURST ) readResp();
+							method ActionValue#( RowBurst ) readResp();
 								dataOut[moduleInd].deq();
 								return dataOut[moduleInd].first();
 							endmethod
 
-							method Action writeData ( ROW_BURST wData );
+							method Action writeData ( RowBurst wData );
 								dataIn[moduleInd].enq(wData);
 							endmethod
 						endinterface;
