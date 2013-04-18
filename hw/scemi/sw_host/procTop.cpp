@@ -22,9 +22,9 @@ int main(int argc, char* argv[]){
   SceMi *sceMi = SceMi::Init(sceMiVersion, &params);
 
   // Initialize the SceMi ports
-  InportProxyT<ROW_REQ> rowReq("", "scemi_m_rowReq_put_inport", sceMi);
-  OutportQueueT<ROW_BURST> rdBurst("", "scemi_m_rdBurst_get_outport", sceMi);
-  InportProxyT<ROW_BURST> wrBurst("", "scemi_m_wrBurst_put_inport", sceMi);
+  InportProxyT<RowReq> rowReq("", "scemi_m_rowReq_put_inport", sceMi);
+  OutportQueueT<RowBurst> rdBurst("", "scemi_m_rdBurst_get_outport", sceMi);
+  InportProxyT<RowBurst> wrBurst("", "scemi_m_wrBurst_put_inport", sceMi);
   ShutdownXactor shutdown("", "scemi_m_shutdown", sceMi);
 
   // Service SceMi requests

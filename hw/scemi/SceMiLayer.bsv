@@ -58,8 +58,8 @@ endmodule
 
 module [SceMiModule] mkrowReqXactor#(RAProcessor proc, SceMiClockPortIfc clk_port ) (Empty);
 
-    Put#(ROW_REQ) req = interface Put;
-        method Action put(ROW_REQ x) = proc.hostDataIO.rowReq(x);
+    Put#(RowReq) req = interface Put;
+        method Action put(RowReq x) = proc.hostDataIO.rowReq(x);
     endinterface;
 
     Empty put <- mkPutXactor(req, clk_port);
@@ -67,8 +67,8 @@ endmodule
 
 module [SceMiModule] mkrdBurstXactor#(RAProcessor proc, SceMiClockPortIfc clk_port ) (Empty);
 
-    Get#(ROW_BURST) resp = interface Get;
-        method ActionValue#(ROW_BURST) get = proc.hostDataIO.readResp();
+    Get#(RowBurst) resp = interface Get;
+        method ActionValue#(RowBurst) get = proc.hostDataIO.readResp();
     endinterface;
 
     Empty get <- mkGetXactor(resp, clk_port);
@@ -76,8 +76,8 @@ endmodule
 
 module [SceMiModule] mkwrBurstXactor#(RAProcessor proc, SceMiClockPortIfc clk_port ) (Empty);
 
-    Put#(ROW_BURST) req = interface Put;
-        method Action put(ROW_BURST x) = proc.hostDataIO.writeData(x);
+    Put#(RowBurst) req = interface Put;
+        method Action put(RowBurst x) = proc.hostDataIO.writeData(x);
     endinterface;
 
     Empty put <- mkPutXactor(req, clk_port);

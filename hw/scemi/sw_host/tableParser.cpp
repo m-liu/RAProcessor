@@ -43,10 +43,10 @@ vector<string> getTokens(string const &in){
   return container;
 }
 
-void loadChunk(uint32_t start_addr, uint32_t numRows, InportProxyT<ROW_REQ> &rowReq, InportProxyT<ROW_BURST> &wrBurst){
-  ROW_REQ request;
-  Op wr_op;
-  wr_op.m_val = Op::e_WRITE;
+void loadChunk(uint32_t start_addr, uint32_t numRows, InportProxyT<RowReq> &rowReq, InportProxyT<RowBurst> &wrBurst){
+  RowReq request;
+  MemOp wr_op;
+  wr_op.m_val = MemOp::e_WRITE;
   
   request.m_op = wr_op;
   request.m_reqSrc = 0;
@@ -64,7 +64,7 @@ void loadChunk(uint32_t start_addr, uint32_t numRows, InportProxyT<ROW_REQ> &row
   }
 }
 
-bool parsecsv(const char *filename, const uint32_t tb_num, const uint32_t start_addr,InportProxyT<ROW_REQ> &rowReq, InportProxyT<ROW_BURST> &wrBurst){
+bool parsecsv(const char *filename, const uint32_t tb_num, const uint32_t start_addr,InportProxyT<RowReq> &rowReq, InportProxyT<RowBurst> &wrBurst){
   //FILE *file = fopen(filename, "r");
   ifstream file(filename);
   string line;
@@ -141,10 +141,10 @@ bool parsecsv(const char *filename, const uint32_t tb_num, const uint32_t start_
   }
 */
 
-void dumpMemory(InportProxyT<ROW_REQ> &rowReq, OutportQueueT<ROW_BURST> &rdBurst){
-  ROW_REQ request;
-  Op wr_op;
-  wr_op.m_val = Op::e_READ;
+void dumpMemory(InportProxyT<RowReq> &rowReq, OutportQueueT<RowBurst> &rdBurst){
+  RowReq request;
+  MemOp wr_op;
+  wr_op.m_val = MemOp::e_READ;
    
   for (uint32_t tb_num = 0; tb_num < globalNextMeta; tb_num++){
     cout << "Table Name:\t" << globalTableMeta[tb_num].tableName;
@@ -174,7 +174,7 @@ void dumpMemory(InportProxyT<ROW_REQ> &rowReq, OutportQueueT<ROW_BURST> &rdBurst
   }
 }
 
-bool parsecsv(InportProxyT<ROW_REQ> &rowReq, InportProxyT<ROW_BURST> &wrBurst){
+bool parsecsv(InportProxyT<RowReq> &rowReq, InportProxyT<RowBurst> &wrBurst){
   
   DIR *pDIR;
   struct dirent *entry;
