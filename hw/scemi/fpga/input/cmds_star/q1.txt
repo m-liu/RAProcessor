@@ -1,0 +1,3 @@
+SELECT,star1,tableOut,mass,>,8000
+PROJECT,tableOut,tableOut2,iOrder
+DEDUP,tableOut2,tableOut3

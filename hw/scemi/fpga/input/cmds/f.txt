@@ -1,0 +1,6 @@
+SELECT,works,tableOut0,company_name,=,911
+PROJECT,tableOut0,tableOut1,person_name
+DEDUP,tableOut1,tableOut2
+PROJECT,works,tableOut3,person_name
+DEDUP,tableOut3,tableOut4,person_name
+DIFFERENCE,tableOut4,tableOut2,result
