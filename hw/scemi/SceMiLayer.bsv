@@ -29,20 +29,58 @@ import GetPut::*;
 import SceMi::*;
 
 import DDR2::*;
-import Dut::*;
+import procTop::*;
+import RowMarshaller::*;
+
+//import Dut::*;
+
+typedef RAProcessor Dut;
 
 module [SceMiModule] mkSceMiLayer(SceMiClockPortIfc clk_port, DDR2Client ifc);
 
-    Dut dut <- buildDut(mkDut, clk_port);
-
-    Empty request <- mkPutXactor(dut.request, clk_port);
+    //Dut dut <- buildDut(mkDut, clk_port);
+   Dut dut <- buildDut(mkRAProcessor, clk_port);
+   
+   /* 
+   Empty request <- mkPutXactor(dut.request, clk_port);
     Empty response <- mkGetXactor(dut.response, clk_port);
     Empty holdback <- mkPutXactor(dut.holdback, clk_port);
-
+   */
+   Empty rowReq <- mkrowReqXactor(dut, clk_port);
+   Empty rdBurst <- mkrdBurstXactor(dut, clk_port);
+   Empty wrBurst <- mkwrBurstXactor(dut, clk_port);
+   
     Empty shutdown <- mkShutdownXactor();
 
     DDR2Client ddr2 <- mkDDR2Xactor(dut.ddr2, clk_port);
     return ddr2;
+endmodule
+
+module [SceMiModule] mkrowReqXactor#(RAProcessor proc, SceMiClockPortIfc clk_port ) (Empty);
+
+    Put#(ROW_REQ) req = interface Put;
+        method Action put(ROW_REQ x) = proc.hostDataIO.rowReq(x);
+    endinterface;
+
+    Empty put <- mkPutXactor(req, clk_port);
+endmodule
+
+module [SceMiModule] mkrdBurstXactor#(RAProcessor proc, SceMiClockPortIfc clk_port ) (Empty);
+
+    Get#(ROW_BURST) resp = interface Get;
+        method ActionValue#(ROW_BURST) get = proc.hostDataIO.readResp();
+    endinterface;
+
+    Empty get <- mkGetXactor(resp, clk_port);
+endmodule
+
+module [SceMiModule] mkwrBurstXactor#(RAProcessor proc, SceMiClockPortIfc clk_port ) (Empty);
+
+    Put#(ROW_BURST) req = interface Put;
+        method Action put(ROW_BURST x) = proc.hostDataIO.writeData(x);
+    endinterface;
+
+    Empty put <- mkPutXactor(req, clk_port);
 endmodule
 
 // mkDDr2Xactor Brings a DDR2Client from the controlled clock domain out into

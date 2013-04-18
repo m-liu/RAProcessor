@@ -1,0 +1,11 @@
+SELECT,works,tableOut0,company_name,=,120
+PROJECT,tableOut0,tableOut1,salary
+DEDUP,tableOut1,tableOut2
+XPROD,works,tableOut2,tableOut3
+RENAME,tableOut3,3,s_salary
+SELECT,tableOut3,tableOut4,salary,<=,s_salary
+PROJECT,tableOut4,tableOut5,person_name
+DEDUP,tableOut5,tableOut6
+PROJECT,works,tableOut7,person_name
+DEDUP,tableOut7,tableOut8
+DIFFERENCE,tableOut8,tableOut6,result

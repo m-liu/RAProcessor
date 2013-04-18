@@ -1,0 +1,83 @@
+#include <iostream>     
+#include <unistd.h>     
+#include <cmath>        
+#include <cstdio>       
+#include <cstdlib>      
+#include <string.h>     
+#include <stdint.h>     
+                        
+#include "globalTypes.h"
+#include "tableParser.h"
+#include "genCommand.h" 
+//#include "procModel.h"
+
+#include "SceMiHeaders.h"
+
+int main(int argc, char* argv[]){
+  
+  /****Booting Up Scemi****/
+  // Scemi
+  int sceMiVersion = SceMi::Version( SCEMI_VERSION_STRING );
+  SceMiParameters params("scemi.params");
+  SceMi *sceMi = SceMi::Init(sceMiVersion, &params);
+
+  // Initialize the SceMi ports
+  InportProxyT<ROW_REQ> rowReq("", "scemi_m_rowReq_put_inport", sceMi);
+  OutportQueueT<ROW_BURST> rdBurst("", "scemi_m_rdBurst_get_outport", sceMi);
+  InportProxyT<ROW_BURST> wrBurst("", "scemi_m_wrBurst_put_inport", sceMi);
+  ShutdownXactor shutdown("", "scemi_m_shutdown", sceMi);
+
+  // Service SceMi requests
+  SceMiServiceThread *scemi_service_thread = new SceMiServiceThread(sceMi);
+
+  /****Parsing Tables/Command*****/
+  
+  if (argc < 2) {
+    fprintf(stderr, "\nInput a command file\n");
+    return 1;
+  }
+
+  char* cmdIn = argv[1];
+
+  printf("\nReading the CSV files in directory ./input/.........\n");
+  if ( !parsecsv(rowReq, wrBurst) ) {
+    fprintf(stderr, "\nMemInit Unsuccessful\n");
+  }
+  else{
+    printf("\nCSV files Read Successful, Memory Initialized!...........\n\n");
+  }
+
+  /*
+  globalNCmds = genCommand(cmdIn, globalCmdEntryBuff);
+
+  printf("command dump BEFORE execution:\n");
+  for (uint32_t i=0; i<globalNCmds; i++){
+    dumpCmdEntry(globalCmdEntryBuff[i]);
+  }
+
+  //runProcModel();
+
+  printf("command dump AFTER execution:\n");
+  for (uint32_t i=0; i<globalNCmds; i++){
+    dumpCmdEntry(globalCmdEntryBuff[i]);
+  }
+  dumpTableMetas();
+  */
+
+  printf("\n************************************\n");
+  printf("Final table values:\n");
+  dumpMemory(rowReq, rdBurst);
+  /*
+  for (uint32_t i=0; i<globalNextMeta; i++){
+    printTable(i);
+  }
+  */
+
+  /****Shutting down SceMi****/
+  shutdown.blocking_send_finish();
+  scemi_service_thread->stop();
+  scemi_service_thread->join();
+  SceMi::Shutdown(sceMi);
+
+  return 0;
+}
