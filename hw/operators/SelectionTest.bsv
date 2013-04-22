@@ -110,12 +110,23 @@ module mkSelectionTest();
 	rule testSelect if (state==TEST_SELECT);
 
 		Vector#(MAX_CLAUSES, SelClause) testClauses = newVector();
+
+		//col [1] > DEADBEFF
 		testClauses[0] = SelClause{ 
 							clauseType: COL_VAL,
-							colOffset0: 1,
+							colOffset0: 4,
 							colOffset1: 0,
 							op: GT,
 							val: 'hDEADBEFF };
+
+		//OR col [4] < col [0] (never true)
+		testClauses[4] = SelClause{ 
+							clauseType: COL_COL,
+							colOffset0: 4,
+							colOffset1: 5,
+							op: GT,
+							val: 'hDEADFFFF };
+
 
 		CmdEntry cmd = CmdEntry {
 							op: SELECT,
@@ -124,7 +135,7 @@ module mkSelectionTest();
 							table0numCols: 32, //just use max for now
 							outputAddr: 50, 
 							clauses: testClauses,
-							validClauseMask: 'h1 
+							validClauseMask: 'h11 //OR
 						};
 		selection.pushCommand(cmd);	
 		state <= TEST_WAIT;

@@ -25,14 +25,16 @@ endfunction
 
 function Bit#(32) getPredVal0(SelClause clause, Row rowBuff);
 	//always get predVal0 from column
-	let colBitOffset = (clause.colOffset0 << valueOf(TLog#(COL_WIDTH)));
+	Bit#(32) colOffsetEx = zeroExtend(clause.colOffset0);
+	Bit#(32) colBitOffset = (colOffsetEx << valueOf(TLog#(COL_WIDTH)));
 	return truncateLSB( rowBuff << colBitOffset );
 endfunction
 
 function Bit#(32) getPredVal1(SelClause clause, Row rowBuff);
 	//determine clause type
 	if (clause.clauseType == COL_COL) begin
-		let colBitOffset = (clause.colOffset1 << valueOf(TLog#(COL_WIDTH)));
+		Bit#(32) colOffsetEx = zeroExtend(clause.colOffset1);
+		Bit#(32) colBitOffset = (colOffsetEx << valueOf(TLog#(COL_WIDTH)));
 		return truncateLSB( rowBuff << colBitOffset );
 	end
 	else begin //if COL_VAL
@@ -63,7 +65,6 @@ module mkSelection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 								op: READ } );
 		rowBuff <= 0;
 		rowBurstCnt <= 0;
-		outputAddrCnt <= 0;
 		inputAddrCnt <= inputAddrCnt + 1;
 		state <= SEL_BUFFER_ROW;
 	endrule
@@ -90,12 +91,14 @@ module mkSelection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 			if (currCmd.validClauseMask[p] == 1) begin
 				let predVal0 = getPredVal0(currCmd.clauses[p], rowBuff);
 				let predVal1 = getPredVal1(currCmd.clauses[p], rowBuff);
+				$display("row=%x", rowBuff);
+				$display("predVal0=%x, predVal1=%x", predVal0, predVal1);
 				if (evalPredicate (predVal0, predVal1, currCmd.clauses[p].op)) begin
-					//$display("SELECT: predicate [%d] is true", p);
+					$display("SELECT: predicate [%d] is true", p);
 					predResults[p] = 1; 
 				end
 				else begin
-					//$display("SELECT: predicate [%d] is false", p);
+					$display("SELECT: predicate [%d] is false", p);
 					predResults[p] = 0; 
 				end
 			end
@@ -151,6 +154,7 @@ module mkSelection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 			inputAddrCnt <= 0;
 			cmdQ.deq();
 			ackRows.enq(outputAddrCnt);
+			outputAddrCnt <= 0;
 		end
 		
 		state <= SEL_IDLE;
