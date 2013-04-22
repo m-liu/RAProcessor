@@ -25,12 +25,14 @@
 import Clocks::*;
 import Connectable::*;
 import DefaultValue::*;
+import ClientServer::*;
 import GetPut::*;
 import SceMi::*;
 
 import DDR2::*;
 import procTop::*;
 import RowMarshaller::*;
+import CmdBufferTypes::*;
 
 //import Dut::*;
 
@@ -49,6 +51,8 @@ module [SceMiModule] mkSceMiLayer(SceMiClockPortIfc clk_port, DDR2Client ifc);
    Empty rowReq <- mkrowReqXactor(dut, clk_port);
    Empty rdBurst <- mkrdBurstXactor(dut, clk_port);
    Empty wrBurst <- mkwrBurstXactor(dut, clk_port);
+   Empty cmdBuffRequest <- mkPutXactor(dut.cmdBuffInit.request,  clk_port);
+   Empty loadCmdBuffSize <- mkPutXactor(dut.loadCmdBuffSize, clk_port);
    
     Empty shutdown <- mkShutdownXactor();
 

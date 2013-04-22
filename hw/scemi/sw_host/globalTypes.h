@@ -29,21 +29,21 @@ struct TableMetaEntry {
 
 
 
-enum CmdOp {SELECT, PROJECT, UNION, DIFFERENCE, XPROD, DEDUP, RENAME}; 
-enum CompOp {EQ, LT, LE, GT, GE, NE}; 
-enum ClauseType {COL_COL, COL_VAL}; 
-enum ClauseCon {AND, OR}; 
+enum CmdOp_sw {SELECT, PROJECT, UNION, DIFFERENCE, XPROD, DEDUP, RENAME}; 
+enum CompOp_sw {EQ, LT, LE, GT, GE, NE}; 
+enum ClauseType_sw {COL_COL, COL_VAL}; 
+enum ClauseCon_sw {AND, OR}; 
 
-struct SelClause {
-    ClauseType clauseType;
+struct SelClause_sw {
+    ClauseType_sw clauseType;
     uint32_t colOffset0;
     uint32_t colOffset1;
-    CompOp op;
+    CompOp_sw op;
     long int val;
 };
 
-struct CmdEntry {
-    CmdOp op;
+struct CmdEntry_sw {
+    CmdOp_sw op;
     uint32_t table0Addr;
     uint32_t table0numRows;
     uint32_t table0numCols;
@@ -51,8 +51,8 @@ struct CmdEntry {
 
     //Select
     uint32_t numClauses;
-    SelClause clauses[MAX_CLAUSES];
-    ClauseCon con[MAX_CLAUSES-1]; //AND/OR connectors between clauses
+    SelClause_sw clauses[MAX_CLAUSES];
+    ClauseCon_sw con[MAX_CLAUSES-1]; //AND/OR connectors between clauses
 
     //Project
     uint32_t colProjectMask;
@@ -71,7 +71,7 @@ extern TableMetaEntry globalTableMeta[MAX_TABLES];
 extern uint32_t globalNextMeta;
 extern uint32_t globalNextAddr;
 
-extern CmdEntry globalCmdEntryBuff[MAX_NUM_CMDS];
+extern CmdEntry_sw globalCmdEntryBuff[MAX_NUM_CMDS];
 extern uint32_t globalNCmds;
 
 //Global access functions

@@ -7,7 +7,7 @@ TableMetaEntry globalTableMeta[MAX_TABLES];
 uint32_t globalNextMeta = 0;
 uint32_t globalNextAddr = 0;
 
-CmdEntry globalCmdEntryBuff[MAX_NUM_CMDS];
+CmdEntry_sw globalCmdEntryBuff[MAX_NUM_CMDS];
 uint32_t globalNCmds = 0;
 
 

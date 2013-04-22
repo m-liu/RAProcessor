@@ -56,8 +56,8 @@ uint32_t getColOffset (char *col, TableMetaEntry tableMeta){
 	exit (EXIT_FAILURE);
 }
 
-SelClause getClause (char *col1, char *op, char *col2_or_val, TableMetaEntry tableMeta) {
-    SelClause clause;
+SelClause_sw getClause (char *col1, char *op, char *col2_or_val, TableMetaEntry tableMeta) {
+    SelClause_sw clause;
     long int val;
     char *pEnd;
 
@@ -114,7 +114,7 @@ void dumpTableMetas(){
 
 
 
-void dumpCmdEntry (CmdEntry cmdEntry){
+void dumpCmdEntry (CmdEntry_sw cmdEntry){
     printf("\ncmdEntry.op=%d\n", cmdEntry.op);
     printf("cmdEntry 1st input table: %d rows x %d cols @ addr=%d\n", cmdEntry.table0numRows, cmdEntry.table0numCols, cmdEntry.table0Addr);
 	printf("cmdEntry output table addr=%d\n", cmdEntry.outputAddr);
@@ -122,7 +122,7 @@ void dumpCmdEntry (CmdEntry cmdEntry){
 	if (cmdEntry.op == SELECT){
 		printf("---SELECT---\n");
 		for (uint32_t c=0; c<cmdEntry.numClauses; c++){
-			SelClause cl = cmdEntry.clauses[c];
+			SelClause_sw cl = cmdEntry.clauses[c];
 			printf("clause %d: ", c);
 			if (cl.clauseType==COL_COL){
 				printf("type: COL_COL "); 
@@ -159,9 +159,9 @@ void dumpCmdEntry (CmdEntry cmdEntry){
 // Parsers to parse each operator command
 //****************************************
 
-CmdEntry parseSelect (char cmdTokens[][MAX_CHARS], int numTokens){
+CmdEntry_sw parseSelect (char cmdTokens[][MAX_CHARS], int numTokens){
     printf("parsing SELECT...\n");
-    CmdEntry cmdEntry;
+    CmdEntry_sw cmdEntry;
 
     //find the metadata of the input table
     TableMetaEntry tableMeta = findTableMetadata(cmdTokens[1]);
@@ -210,9 +210,9 @@ CmdEntry parseSelect (char cmdTokens[][MAX_CHARS], int numTokens){
     return cmdEntry;
 }
 
-CmdEntry parseProject (char cmdTokens[][MAX_CHARS], int numTokens){
+CmdEntry_sw parseProject (char cmdTokens[][MAX_CHARS], int numTokens){
     printf("parsing PROJECT...\n");
-    CmdEntry cmdEntry;
+    CmdEntry_sw cmdEntry;
  
  	TableMetaEntry tableMeta = findTableMetadata(cmdTokens[1]);
 
@@ -268,9 +268,9 @@ CmdEntry parseProject (char cmdTokens[][MAX_CHARS], int numTokens){
 	
 }
 
-CmdEntry parseUnion (char cmdTokens[][MAX_CHARS], int numTokens){
+CmdEntry_sw parseUnion (char cmdTokens[][MAX_CHARS], int numTokens){
     printf("parsing UNION...\n");
-    CmdEntry cmdEntry;
+    CmdEntry_sw cmdEntry;
  	
 	TableMetaEntry tableMeta0 = findTableMetadata(cmdTokens[1]);
 	TableMetaEntry tableMeta1 = findTableMetadata(cmdTokens[2]);
@@ -300,9 +300,9 @@ CmdEntry parseUnion (char cmdTokens[][MAX_CHARS], int numTokens){
 
 }
 
-CmdEntry parseDifference (char cmdTokens[][MAX_CHARS], int numTokens){
+CmdEntry_sw parseDifference (char cmdTokens[][MAX_CHARS], int numTokens){
     printf("parsing DIFFERENCE...\n");
-    CmdEntry cmdEntry;
+    CmdEntry_sw cmdEntry;
 
 	TableMetaEntry tableMeta0 = findTableMetadata(cmdTokens[1]);
 	TableMetaEntry tableMeta1 = findTableMetadata(cmdTokens[2]);
@@ -331,9 +331,9 @@ CmdEntry parseDifference (char cmdTokens[][MAX_CHARS], int numTokens){
 }
 
 
-CmdEntry parseXprod (char cmdTokens[][MAX_CHARS], int numTokens){
+CmdEntry_sw parseXprod (char cmdTokens[][MAX_CHARS], int numTokens){
     printf("parsing XPROD...\n");
-    CmdEntry cmdEntry;
+    CmdEntry_sw cmdEntry;
 
 	TableMetaEntry tableMeta0 = findTableMetadata(cmdTokens[1]);
 	TableMetaEntry tableMeta1 = findTableMetadata(cmdTokens[2]);
@@ -370,9 +370,9 @@ CmdEntry parseXprod (char cmdTokens[][MAX_CHARS], int numTokens){
 }
 
 
-CmdEntry parseDedup (char cmdTokens[][MAX_CHARS], int numTokens){
+CmdEntry_sw parseDedup (char cmdTokens[][MAX_CHARS], int numTokens){
     printf("parsing DEDUP...\n");
-    CmdEntry cmdEntry;
+    CmdEntry_sw cmdEntry;
 
 	TableMetaEntry tableMeta0 = findTableMetadata(cmdTokens[1]);
 
@@ -419,7 +419,7 @@ void parseRename (char cmdTokens[][MAX_CHARS], int numTokens){
 //************************************************************
 
 //returns how many commands it got
-uint32_t genCommand(const char *cmdFilePath, CmdEntry *cmdEntryBuff) {
+uint32_t genCommand(const char *cmdFilePath, CmdEntry_sw *cmdEntryBuff) {
     FILE *cmdFile = fopen(cmdFilePath, "r"); 
     char cmdLine[MAX_CHARS];
     char cmdTokens[MAX_CMD_TOKENS][MAX_CHARS];
@@ -497,3 +497,111 @@ uint32_t genCommand(const char *cmdFilePath, CmdEntry *cmdEntryBuff) {
 
 
 
+/******load commands on to fpga BRAM thru SceMi*******/
+void loadCommands(InportProxyT<BuffInit> & cmdBuffRequest, CmdEntry_sw *cmdEntryBuff){
+  BuffInit msg;
+  
+  BuffInitLoad msg_ld;
+
+  CmdEntry cmdEntry;
+
+
+  for ( uint32_t i = 0; i < globalNCmds; i++){
+    CmdEntry_sw cmdEntry_sw = cmdEntryBuff[i];
+    cmdEntry.m_table0Addr = cmdEntry_sw.table0Addr;
+    cmdEntry.m_table0numRows = cmdEntry_sw.table0numRows;
+    cmdEntry.m_table0numCols = cmdEntry_sw.table0numCols;
+    cmdEntry.m_outputAddr = cmdEntry_sw.outputAddr;
+    cmdEntry.m_numClauses = cmdEntry_sw.numClauses;
+    cmdEntry.m_colProjectMask = cmdEntry_sw.colProjectMask;
+    cmdEntry.m_table1Addr = cmdEntry_sw.table1Addr;
+    cmdEntry.m_table1numRows = cmdEntry_sw.table1numRows;
+    cmdEntry.m_table1numCols = cmdEntry_sw.table1numCols;
+    
+    switch (cmdEntry_sw.op){
+    case SELECT:
+      cmdEntry.m_op.m_val = CmdOp::e_SELECT;
+      
+      for ( uint32_t j = 0; j < cmdEntry_sw.numClauses; j++){
+
+	//**********loading clauses******
+	switch ( (cmdEntry_sw.clauses)[j].clauseType ){
+	case COL_COL:
+	  ((cmdEntry.m_clauses)[j]).m_clauseType.m_val = ClauseType::e_COL_COL;
+	  break;
+	case COL_VAL:
+	  ((cmdEntry.m_clauses)[j]).m_clauseType.m_val = ClauseType::e_COL_VAL;
+	  break;
+	default:
+	  break;
+	}
+	(cmdEntry.m_clauses)[j].m_colOffset0 = (cmdEntry_sw.clauses)[j].colOffset0;
+	(cmdEntry.m_clauses)[j].m_colOffset1 = (cmdEntry_sw.clauses)[j].colOffset1;
+	switch ((cmdEntry_sw.clauses)[j].op){
+	case EQ:
+	  ((cmdEntry.m_clauses)[j]).m_op.m_val = CompOp::e_EQ;
+	  break;	
+	case LT:
+	  ((cmdEntry.m_clauses)[j]).m_op.m_val = CompOp::e_LT;
+	  break;
+	case LE:
+	  ((cmdEntry.m_clauses)[j]).m_op.m_val = CompOp::e_LE;
+	  break;
+	case GT:
+	  ((cmdEntry.m_clauses)[j]).m_op.m_val = CompOp::e_GT;
+	  break;
+	case GE:
+	  ((cmdEntry.m_clauses)[j]).m_op.m_val = CompOp::e_GE;
+	  break;
+	case NE:
+	  ((cmdEntry.m_clauses)[j]).m_op.m_val = CompOp::e_NE;
+	  break;
+	default:
+	  break;
+	}
+	(cmdEntry.m_clauses)[j].m_val = (cmdEntry_sw.clauses)[j].val;
+
+	//*****load clause_cons*****
+	if ( j < cmdEntry_sw.numClauses - 1 ){
+	  switch ( (cmdEntry_sw.con)[j] ){
+	  case AND:
+	    (cmdEntry.m_con)[j].m_val = ClauseCon::e_AND;
+	    break;
+	  case OR:
+	    (cmdEntry.m_con)[j].m_val = ClauseCon::e_OR;
+	    break;
+	  default:
+	  break;
+	  }
+	}
+      }
+      break;
+    case PROJECT:
+      cmdEntry.m_op.m_val = CmdOp::e_PROJECT;
+      break;
+    case UNION:
+      cmdEntry.m_op.m_val = CmdOp::e_UNION;
+      break;
+    case DIFFERENCE:
+      cmdEntry.m_op.m_val = CmdOp::e_DIFFERENCE;
+      break;
+    case XPROD:
+      cmdEntry.m_op.m_val = CmdOp::e_XPROD;
+      break;
+    case DEDUP:
+      cmdEntry.m_op.m_val = CmdOp::e_DEDUP;
+    default:
+      break;
+    }
+    msg_ld.m_index  = i;
+    msg_ld.m_data = cmdEntry;
+    msg.the_tag = BuffInit::tag_InitLoad;
+    msg.m_InitLoad = msg_ld;
+    cmdBuffRequest.sendMessage(msg);
+  }
+  
+  /**finish**/
+  msg.the_tag = BuffInit::tag_InitDone;
+  cmdBuffRequest.sendMessage(msg);
+
+}

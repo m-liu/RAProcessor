@@ -5,7 +5,7 @@
 #include <string>
 #include <string.h>
 #include <vector>
-#include<dirent.h>
+#include <dirent.h>
 using namespace std;
 
 
