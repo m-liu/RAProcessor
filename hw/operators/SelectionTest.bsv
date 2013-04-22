@@ -12,7 +12,7 @@ import XilinxDDR2::*;
 import DDR2::*;
 
 
-typedef enum { TEST_IDLE, TEST_REQ, TEST_WR, TEST_RD, TEST_DONE } TestState deriving (Eq, Bits);
+typedef enum { TEST_IDLE, TEST_REQ, TEST_WR, TEST_RD, TEST_DONE, TEST_SELECT, TEST_WAIT, TEST_PRINT } TestState deriving (Eq, Bits);
 
 
 //typedef 3 SEL_OP;
@@ -46,11 +46,11 @@ module mkSelectionTest();
 							reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
 							op: READ };
 	
-	testReq[2] = RowReq{ 	rowAddr: 20,
+	testReq[2] = RowReq{ 	rowAddr: 10,
 						  	numRows: 5,
 							reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
 							op: WRITE };
-	testReq[3] = RowReq{ 	rowAddr: 20,
+	testReq[3] = RowReq{ 	rowAddr: 10,
 						  	numRows: 5,
 							reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
 							op: READ };
@@ -71,7 +71,8 @@ module mkSelectionTest();
 			end
 		end
 		else begin
-			$finish;
+			//start SELECTION block
+			state <= TEST_SELECT;
 		end
 	endrule
 
@@ -105,4 +106,55 @@ module mkSelectionTest();
 		end
 	endrule
 	
+
+	rule testSelect if (state==TEST_SELECT);
+
+		Vector#(MAX_CLAUSES, SelClause) testClauses = newVector();
+		testClauses[0] = SelClause{ 
+							clauseType: COL_VAL,
+							colOffset0: 1,
+							colOffset1: 0,
+							op: GT,
+							val: 'hDEADBEFF };
+
+		CmdEntry cmd = CmdEntry {
+							op: SELECT,
+							table0Addr: 23,
+							table0numRows: 3,
+							table0numCols: 32, //just use max for now
+							outputAddr: 50, 
+							clauses: testClauses,
+							validClauseMask: 'h1 
+						};
+		selection.pushCommand(cmd);	
+		state <= TEST_WAIT;
+	endrule
+
+	rule waitSelect if (state == TEST_WAIT);
+		let respRows <- selection.getAckRows();
+		$display("Select done. Num rows = %d", respRows);
+		//make req to print results
+		RowReq req = RowReq{ 	rowAddr: 50,
+						  	numRows: 3,
+							reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
+							op: READ };
+		marsh.rowAccesses[valueOf(DATA_IO_BLK)].rowReq(req);
+		state <= TEST_PRINT;
+	endrule
+
+	rule printResults if (state == TEST_PRINT);
+		let rburst = marsh.rowAccesses[valueOf(DATA_IO_BLK)].readResp;
+		$display("rburst [%d]: %x", brCount, rburst);
+		if (brCount == (3*fromInteger(valueOf(BURSTS_PER_ROW)))-1) begin
+		//if (brCount == currReq.numRows*32-1) begin
+			brCount <= 0;
+			state <= TEST_IDLE;
+			$display("TB: done reading bursts");
+			$finish;
+		end
+		else begin
+			brCount <= brCount+1;
+		end	
+	endrule
+
 endmodule

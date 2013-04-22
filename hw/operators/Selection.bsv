@@ -49,13 +49,10 @@ module mkSelection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 	Reg#(RowAddr) rowBurstCnt <- mkReg(0);
 	Reg#(RowAddr) outputAddrCnt <- mkReg(0);
 	Reg#(RowAddr) inputAddrCnt <- mkReg(0);
-	//Vector#(MAX_CLAUSES, Reg#(Bool)) predResults <- replicateM(mkReg(False));
-	//Vector#(MAX_CLAUSES, Reg#(Bool)) predResultsRemap <- replicateM(mkReg(False));
 	
 	let currCmd = cmdQ.first();
 	
 	
-
 	//send req to read rows
 	//TODO!! only req 1 row at a time right now
 	rule reqRows if (state == SEL_IDLE);
@@ -66,8 +63,9 @@ module mkSelection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 								op: READ } );
 		rowBuff <= 0;
 		rowBurstCnt <= 0;
-		state <= SEL_BUFFER_ROW;
+		outputAddrCnt <= 0;
 		inputAddrCnt <= inputAddrCnt + 1;
+		state <= SEL_BUFFER_ROW;
 	endrule
 
 	//buffer a whole row
@@ -85,58 +83,37 @@ module mkSelection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 		
 
 	rule processRow if (state==SEL_PROCESS_ROW);
-		Bit#(MAX_CLAUSES) predResults = 0;
-		//NOTE only the first numClauses predicates are valid
+		//Important: default result values [16:0]: 1110 1110 1110 1110
+		Bit#(MAX_CLAUSES) predResults = 16'hEEEE;
 		for (Integer p=0; p < valueOf(MAX_CLAUSES); p=p+1) begin
-			let predVal0 = getPredVal0(currCmd.clauses[p], rowBuff);
-			let predVal1 = getPredVal1(currCmd.clauses[p], rowBuff);
-			if (evalPredicate (predVal0, predVal1, currCmd.clauses[p].op)) begin
-				predResults[p] = 1; 
+			//if clause is valid, evaluate it. otherwise use default val
+			if (currCmd.validClauseMask[p] == 1) begin
+				let predVal0 = getPredVal0(currCmd.clauses[p], rowBuff);
+				let predVal1 = getPredVal1(currCmd.clauses[p], rowBuff);
+				if (evalPredicate (predVal0, predVal1, currCmd.clauses[p].op)) begin
+					//$display("SELECT: predicate [%d] is true", p);
+					predResults[p] = 1; 
+				end
+				else begin
+					//$display("SELECT: predicate [%d] is false", p);
+					predResults[p] = 0; 
+				end
 			end
-			else begin
-				predResults[p] = 0; 
-			end
-			
 		end
 		
-		//remap the results
-		//init to 0111 0111 0111 0111
-		Bit#(MAX_CLAUSES) resRemap = 16'h7777; 
-		Integer pTarg = 0;
-		for (Integer p=0; p < valueOf(MAX_CLAUSES); p=p+1) begin
-			if ( p==0 ) begin
-				//always assign 1st val
-				resRemap[pTarg] = predResults[p]; 
-			end
-			else if( fromInteger(p) < currCmd.numClauses ) begin
-				if (currCmd.con[p-1] == AND) begin
-					resRemap[pTarg] = predResults[p];
-				end
-				else begin //OR
-					//go to next boundary of 4
-					pTarg = ((pTarg+4) / 4 * 4) -1; //FIXME not sure if this works
-				end
-
-			end
-			pTarg = pTarg+1;
-		end
-		//AND/OR the results
-		let accept = ( (resRemap[0] & resRemap[1] & resRemap[2] & resRemap[3]) |
-						(resRemap[4] & resRemap[5] & resRemap[6] & resRemap[7]) |
-						(resRemap[8] & resRemap[9] & resRemap[10] & resRemap[11]) |
-						(resRemap[12] & resRemap[13] & resRemap[14] & resRemap[15]) );
-		
-	   /*
+	    $display("SELECT: row %d all predicates: %x", inputAddrCnt, predResults);
 		let accept = ( (predResults[0] & predResults[1] & predResults[2] & predResults[3]) |
 						(predResults[4] & predResults[5] & predResults[6] & predResults[7]) |
 						(predResults[8] & predResults[9] & predResults[10] & predResults[11]) |
 						(predResults[12] & predResults[13] & predResults[14] & predResults[15]) );
-*/
+
 		if (accept == 1) begin
 			state <= SEL_ACCEPT_ROW;
+			$display("SELECT: row %d accepted", inputAddrCnt);
 		end
 		else begin
 			state <= SEL_DONE_ROW;
+			$display("SELECT: row %d rejected", inputAddrCnt);
 		end
 		
 
@@ -171,6 +148,7 @@ module mkSelection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 	rule doneRow if (state == SEL_DONE_ROW);
 		//ack, deq cmdQ
 		if (inputAddrCnt >= currCmd.table0numRows) begin
+			inputAddrCnt <= 0;
 			cmdQ.deq();
 			ackRows.enq(outputAddrCnt);
 		end
@@ -192,4 +170,41 @@ module mkSelection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 	endmethod
 
 endmodule
+
+
+
+
+
+
+
+
+//	//remap the results
+//	//init to 0111 0111 0111 0111
+//	Bit#(MAX_CLAUSES) resRemap = 16'h7777; 
+//	Integer pTarg = 0;
+//	for (Integer p=0; p < valueOf(MAX_CLAUSES); p=p+1) begin
+//		if ( p==0 ) begin
+//			//always assign 1st val
+//			resRemap[pTarg] = predResults[p]; 
+//		end
+//		else if( fromInteger(p) < currCmd.numClauses ) begin
+//			if (currCmd.con[p-1] == AND) begin
+//				resRemap[pTarg] = predResults[p];
+//			end
+//			else begin //OR
+//				//go to next boundary of 4
+//				pTarg = ((pTarg+4) / 4 * 4) -1; //FIXME not sure if this works
+//			end
+//
+//		end
+//		pTarg = pTarg+1;
+//	end
+//	//AND/OR the results
+//	let accept = ( (resRemap[0] & resRemap[1] & resRemap[2] & resRemap[3]) |
+//					(resRemap[4] & resRemap[5] & resRemap[6] & resRemap[7]) |
+//					(resRemap[8] & resRemap[9] & resRemap[10] & resRemap[11]) |
+//					(resRemap[12] & resRemap[13] & resRemap[14] & resRemap[15]) );
+//
+//
+//
 

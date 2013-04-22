@@ -33,10 +33,11 @@ typedef struct {
 	RowAddr outputAddr;
 
 	//Select
-	Bit#(TLog#(MAX_CLAUSES)) numClauses;
+	Bit#(TLog#(MAX_CLAUSES)) numClauses;		//OBSOLETE
 	Vector#(MAX_CLAUSES, SelClause) clauses;
+	Bit#(MAX_CLAUSES) validClauseMask;
 	//AND/OR connectors between clauses
-	Vector#(TSub#(MAX_CLAUSES,1), ClauseCon) con; 
+	Vector#(TSub#(MAX_CLAUSES,1), ClauseCon) con;  //OBSOLETE
 
 	//Project
 	Bit#(COL_WIDTH) colProjectMask;
