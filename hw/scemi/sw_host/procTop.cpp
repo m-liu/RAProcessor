@@ -25,6 +25,8 @@ int main(int argc, char* argv[]){
   InportProxyT<RowReq> rowReq("", "scemi_m_rowReq_put_inport", sceMi);
   OutportQueueT<RowBurst> rdBurst("", "scemi_m_rdBurst_get_outport", sceMi);
   InportProxyT<RowBurst> wrBurst("", "scemi_m_wrBurst_put_inport", sceMi);
+  InportProxyT<BuffInit> cmdBuffRequest("","scemi_m_cmdBuffRequest_inport", sceMi);
+  InportProxyT<Index> loadCmdBuffSize("","scemi_m_loadCmdBuffSize_inport", sceMi);
   ShutdownXactor shutdown("", "scemi_m_shutdown", sceMi);
 
   // Service SceMi requests
@@ -47,16 +49,22 @@ int main(int argc, char* argv[]){
     printf("\nCSV files Read Successful, Memory Initialized!...........\n\n");
   }
 
-  /*
+  
   globalNCmds = genCommand(cmdIn, globalCmdEntryBuff);
 
+  loadCommands(cmdBuffRequest, globalCmdEntryBuff);
+
+  //printf("num of commands: %d", globalNCmds);
+  loadCmdBuffSize.sendMessage(globalNCmds);
+  
   printf("command dump BEFORE execution:\n");
   for (uint32_t i=0; i<globalNCmds; i++){
     dumpCmdEntry(globalCmdEntryBuff[i]);
   }
-
+  /*
   //runProcModel();
 
+  
   printf("command dump AFTER execution:\n");
   for (uint32_t i=0; i<globalNCmds; i++){
     dumpCmdEntry(globalCmdEntryBuff[i]);
@@ -66,7 +74,7 @@ int main(int argc, char* argv[]){
 
   printf("\n************************************\n");
   printf("Final table values:\n");
-  dumpMemory(rowReq, rdBurst);
+  //dumpMemory(rowReq, rdBurst);
   /*
   for (uint32_t i=0; i<globalNextMeta; i++){
     printTable(i);
