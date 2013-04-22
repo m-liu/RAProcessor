@@ -493,7 +493,44 @@ uint32_t genCommand(const char *cmdFilePath, CmdEntry_sw *cmdEntryBuff) {
 	return cmdInd;
 }
 
-
+void handle_clause(CmdEntry &cmdEntry, CmdEntry_sw const &cmdEntry_sw, uint32_t const dest, uint32_t const src ){
+  //**********loading clauses******
+  switch ( (cmdEntry_sw.clauses)[src].clauseType ){
+  case COL_COL:
+    ((cmdEntry.m_clauses)[dest]).m_clauseType.m_val = ClauseType::e_COL_COL;
+    break;
+  case COL_VAL:
+    ((cmdEntry.m_clauses)[dest]).m_clauseType.m_val = ClauseType::e_COL_VAL;
+    break;
+  default:
+    break;
+  }
+  (cmdEntry.m_clauses)[dest].m_colOffset0 = (cmdEntry_sw.clauses)[src].colOffset0;
+  (cmdEntry.m_clauses)[dest].m_colOffset1 = (cmdEntry_sw.clauses)[src].colOffset1;
+  switch ((cmdEntry_sw.clauses)[src].op){
+  case EQ:
+    ((cmdEntry.m_clauses)[dest]).m_op.m_val = CompOp::e_EQ;
+    break;	
+  case LT:
+    ((cmdEntry.m_clauses)[dest]).m_op.m_val = CompOp::e_LT;
+    break;
+  case LE:
+    ((cmdEntry.m_clauses)[dest]).m_op.m_val = CompOp::e_LE;
+    break;
+  case GT:
+    ((cmdEntry.m_clauses)[dest]).m_op.m_val = CompOp::e_GT;
+    break;
+  case GE:
+    ((cmdEntry.m_clauses)[dest]).m_op.m_val = CompOp::e_GE;
+    break;
+  case NE:
+    ((cmdEntry.m_clauses)[dest]).m_op.m_val = CompOp::e_NE;
+    break;
+  default:
+    break;
+  }
+  (cmdEntry.m_clauses)[dest].m_val = (cmdEntry_sw.clauses)[src].val;
+}
 
 
 
@@ -512,7 +549,7 @@ void loadCommands(InportProxyT<BuffInit> & cmdBuffRequest, CmdEntry_sw *cmdEntry
     cmdEntry.m_table0numRows = cmdEntry_sw.table0numRows;
     cmdEntry.m_table0numCols = cmdEntry_sw.table0numCols;
     cmdEntry.m_outputAddr = cmdEntry_sw.outputAddr;
-    cmdEntry.m_numClauses = cmdEntry_sw.numClauses;
+    //cmdEntry.m_numClauses = cmdEntry_sw.numClauses;
     cmdEntry.m_colProjectMask = cmdEntry_sw.colProjectMask;
     cmdEntry.m_table1Addr = cmdEntry_sw.table1Addr;
     cmdEntry.m_table1numRows = cmdEntry_sw.table1numRows;
@@ -522,59 +559,59 @@ void loadCommands(InportProxyT<BuffInit> & cmdBuffRequest, CmdEntry_sw *cmdEntry
     case SELECT:
       cmdEntry.m_op.m_val = CmdOp::e_SELECT;
       
-      for ( uint32_t j = 0; j < cmdEntry_sw.numClauses; j++){
+      uint32_t or_loc[MAX_CLAUSES/4-1];
+      uint32_t and_loc[3*MAX_CLAUSES/4];
+      
+      for (uint32_t ind_or = 0,ind_and = 0, j = 1; j < MAX_CLAUSES; j++){
+	if ( j % 4 == 0 )
+	  or_loc[ind_or++] = j;
+	else
+	  and_loc[ind_and++] = j;
+      }
+      
+      printf("\nor locations:\n");
+      for ( uint32_t j = 0; j < MAX_CLAUSES/4-1; j++)
+	printf("%d\t",or_loc[j]);
+      
+      printf("\nand locations:\n");
+      for ( uint32_t j = 0; j < 3*MAX_CLAUSES/4; j++)
+	printf("%d\t",and_loc[j]);
+      printf("\n");
 
-	//**********loading clauses******
-	switch ( (cmdEntry_sw.clauses)[j].clauseType ){
-	case COL_COL:
-	  ((cmdEntry.m_clauses)[j]).m_clauseType.m_val = ClauseType::e_COL_COL;
-	  break;
-	case COL_VAL:
-	  ((cmdEntry.m_clauses)[j]).m_clauseType.m_val = ClauseType::e_COL_VAL;
-	  break;
-	default:
-	  break;
-	}
-	(cmdEntry.m_clauses)[j].m_colOffset0 = (cmdEntry_sw.clauses)[j].colOffset0;
-	(cmdEntry.m_clauses)[j].m_colOffset1 = (cmdEntry_sw.clauses)[j].colOffset1;
-	switch ((cmdEntry_sw.clauses)[j].op){
-	case EQ:
-	  ((cmdEntry.m_clauses)[j]).m_op.m_val = CompOp::e_EQ;
-	  break;	
-	case LT:
-	  ((cmdEntry.m_clauses)[j]).m_op.m_val = CompOp::e_LT;
-	  break;
-	case LE:
-	  ((cmdEntry.m_clauses)[j]).m_op.m_val = CompOp::e_LE;
-	  break;
-	case GT:
-	  ((cmdEntry.m_clauses)[j]).m_op.m_val = CompOp::e_GT;
-	  break;
-	case GE:
-	  ((cmdEntry.m_clauses)[j]).m_op.m_val = CompOp::e_GE;
-	  break;
-	case NE:
-	  ((cmdEntry.m_clauses)[j]).m_op.m_val = CompOp::e_NE;
-	  break;
-	default:
-	  break;
-	}
-	(cmdEntry.m_clauses)[j].m_val = (cmdEntry_sw.clauses)[j].val;
-
+      
+      uint16_t validClauseMask;
+      
+      uint32_t ind_or, ind_and;
+      validClauseMask = 0;
+      ind_or = ind_and = 0;
+      
+      if ( cmdEntry_sw.numClauses > 0){
+	handle_clause(cmdEntry, cmdEntry_sw, 0, 0);
+	validClauseMask = 1;
+      }
+      
+      
+      for ( uint32_t j = 0; j < cmdEntry_sw.numClauses - 1; j++){
 	//*****load clause_cons*****
-	if ( j < cmdEntry_sw.numClauses - 1 ){
-	  switch ( (cmdEntry_sw.con)[j] ){
-	  case AND:
-	    (cmdEntry.m_con)[j].m_val = ClauseCon::e_AND;
-	    break;
-	  case OR:
-	    (cmdEntry.m_con)[j].m_val = ClauseCon::e_OR;
-	    break;
-	  default:
+	switch ( (cmdEntry_sw.con)[j] ){
+	case AND:
+	  //(cmdEntry.m_con)[j].m_val = ClauseCon::e_AND;
+	  assert(ind_and < 3*MAX_CLAUSES/4);
+	  validClauseMask = validClauseMask + (1 << (and_loc[ind_and]));
+	  handle_clause(cmdEntry, cmdEntry_sw, and_loc[ind_and++], j);
 	  break;
-	  }
+	case OR:
+	  //(cmdEntry.m_con)[j].m_val = ClauseCon::e_OR;
+	  assert(ind_or < MAX_CLAUSES/4-1);
+	  validClauseMask = validClauseMask + (1 << (or_loc[ind_or]));
+	  handle_clause(cmdEntry, cmdEntry_sw, or_loc[ind_or++], j);
+	  break;
+	default:
+	  break;
 	}
       }
+      
+      cmdEntry.m_validClauseMask = validClauseMask;
       break;
     case PROJECT:
       cmdEntry.m_op.m_val = CmdOp::e_PROJECT;

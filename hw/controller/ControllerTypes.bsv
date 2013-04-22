@@ -27,11 +27,11 @@ typedef struct {
 	RowAddr outputAddr;
 
 	//Select
-	Bit#(TLog#(MAX_CLAUSES)) numClauses;		//OBSOLETE
+	//Bit#(TLog#(MAX_CLAUSES)) numClauses;		//OBSOLETE
 	Vector#(MAX_CLAUSES, SelClause) clauses;
 	Bit#(MAX_CLAUSES) validClauseMask;
 	//AND/OR connectors between clauses
-	Vector#(TSub#(MAX_CLAUSES,1), ClauseCon) con;  //OBSOLETE
+	//Vector#(TSub#(MAX_CLAUSES,1), ClauseCon) con;  //OBSOLETE
 
 	//Project
 	Bit#(COL_WIDTH) colProjectMask;
@@ -53,28 +53,33 @@ function Fmt showCmd(CmdEntry cmdEntry);
       SELECT: 
       begin
 	 ret = ret + fshow("---SELECT---\n");
-	 
-	 for (Bit#(TLog#(MAX_CLAUSES)) i = 0; i < cmdEntry.numClauses; i = i + 1)
+	 ret = ret + $format("validClauseMask: %b\n", cmdEntry.validClauseMask);
+	 /*
+	 for (Integer i = 0; i < valueOf(MAX_CLAUSES); i = i + 1)
 	    begin
-	       
-	       let cl = cmdEntry.clauses[i];
-	       ret = ret + $format("clause %d: ", i);
-	       
-	       ret = ret + (case (cl.clauseType)
-			       COL_COL: fshow("type: COL_COL");
-			       COL_VAL: fshow("type: COL_VAL");
-			    endcase);
-	       
-	       ret = ret + $format("colOffset0:%d, op:%d, val:%d, colOffset1:%d\n", cl.colOffset0, cl.op, cl.val, cl.colOffset1);
-	       
-	       if ( i < cmdEntry.numClauses - 1 )
+
+	       if ( cmdEntry.validClauseMask[i] == 1)
 		  begin
-		     ret = ret + (case (cmdEntry.con[i])
-					AND: $format("clausecon %d: AND\n", i);
-					OR: $format("clausecon %d: OR\n", i);
+		     let cl = cmdEntry.clauses[i];
+		     ret = ret + $format("clause %d: ", i);
+	       
+		     ret = ret + (case (cl.clauseType)
+				     COL_COL: fshow("type: COL_COL");
+				     COL_VAL: fshow("type: COL_VAL");
 				  endcase);
+	       
+		     ret = ret + $format("colOffset0:%d, op:%d, val:%d, colOffset1:%d\n", cl.colOffset0, cl.op, cl.val, cl.colOffset1);
+	       
+		     if ( i > 0 )
+			begin
+			   ret = ret + (case (i%4)
+					   1: $format("clausecon %d: AND\n", i);
+					   0: $format("clausecon %d: OR\n", i);
+					endcase);
+			end
 		  end			  
 	    end
+	  */
       end
       PROJECT:
       begin
