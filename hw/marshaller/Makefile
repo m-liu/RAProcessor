@@ -18,12 +18,12 @@ link:
 .PHONY: simulate
 simulate:
 	@echo Simulation...
-	./out 
+	#./out 
 	@echo Simulation finished
 
 .PHONY: clean
 clean:
-	exec rm -f bscdir/DDR2.bo bscdir/RowMarshaller.bo
+	exec rm -f bscdir/* out out.so
 
 .PHONY: full_clean
 full_clean:

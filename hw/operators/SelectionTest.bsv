@@ -38,11 +38,11 @@ module mkSelectionTest();
 	//Requests
 	Vector#(NUM_TESTS, RowReq) testReq = newVector();
 	testReq[0] = RowReq{ 	rowAddr: 23,
-						  	numRows: 3,
+						  	numRows: 20,
 							reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
 							op: WRITE };
 	testReq[1] = RowReq{ 	rowAddr: 23,
-						  	numRows: 3,
+						  	numRows: 20,
 							reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
 							op: READ };
 	
@@ -131,7 +131,7 @@ module mkSelectionTest();
 		CmdEntry cmd = CmdEntry {
 							op: SELECT,
 							table0Addr: 23,
-							table0numRows: 3,
+							table0numRows: 20,
 							table0numCols: 32, //just use max for now
 							outputAddr: 50, 
 							clauses: testClauses,
@@ -146,7 +146,7 @@ module mkSelectionTest();
 		$display("Select done. Num rows = %d", respRows);
 		//make req to print results
 		RowReq req = RowReq{ 	rowAddr: 50,
-						  	numRows: 3,
+						  	numRows: 20,
 							reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
 							op: READ };
 		marsh.rowAccesses[valueOf(DATA_IO_BLK)].rowReq(req);
@@ -156,7 +156,7 @@ module mkSelectionTest();
 	rule printResults if (state == TEST_PRINT);
 		let rburst = marsh.rowAccesses[valueOf(DATA_IO_BLK)].readResp;
 		$display("rburst [%d]: %x", brCount, rburst);
-		if (brCount == (3*fromInteger(valueOf(BURSTS_PER_ROW)))-1) begin
+		if (brCount == (20*fromInteger(valueOf(BURSTS_PER_ROW)))-1) begin
 		//if (brCount == currReq.numRows*32-1) begin
 			brCount <= 0;
 			state <= TEST_IDLE;

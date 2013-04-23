@@ -30,7 +30,7 @@ module mkRowMarshallerTest();
 
 	//data
 	//Reg#(RowBurst) someData <- mkReg(32'hDEADBEEF);
-	Reg#(RowBurst) someData <- mkReg('hABCD5678DEADBEEF);
+	Reg#(RowBurst) someData <- mkReg('hDEADBEEF);
 
 	//Requests
 	Vector#(NUM_TESTS, RowReq) testReq = newVector();

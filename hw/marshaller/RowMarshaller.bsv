@@ -74,18 +74,26 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 	FIFO#(DDR2Request) ddrReq <- mkFIFO;
 	FIFO#(DDR2Response) ddrResp <- mkFIFO;
 
-	//all req enq into the same req fifo
-	FIFO#(RowReq) rowReqQ <- mkFIFO;
+	//req queues 
+	FIFO#(RowReq) rowReadReqQ <- mkFIFO;
+	FIFO#(RowReq) rowWriteReqQ <- mkFIFO;
 
 	//separate data fifos for each module
-	Vector#(NUM_MODULES, FIFO#(RowBurst)) dataIn <- replicateM (mkFIFO);
-	Vector#(NUM_MODULES, FIFO#(RowBurst)) dataOut <- replicateM (mkFIFO);
+	Vector#(NUM_MODULES, FIFO#(RowBurst)) dataIn <- replicateM (mkSizedFIFO(2*valueOf(BURSTS_PER_ROW)));
+	Vector#(NUM_MODULES, FIFO#(RowBurst)) dataOut <- replicateM (mkSizedFIFO(2*valueOf(BURSTS_PER_ROW)));
+//	Reg#(Bit#(32)) dataOutEmptyCnt <- mkReg(fromInteger(2*valueOf(BURSTS_PER_ROW))); //initialize to size of dataOut
+	Reg#(Bit#(32)) dataOutEnqCnt <- mkReg(0); 
+	Reg#(Bit#(32)) dataOutDeqCnt <- mkReg(0); 
+	//Reg#(Bit#(32)) dataOutDeqCnt <- mkReg(fromInteger(2*valueOf(BURSTS_PER_ROW))); //initialize to size of dataOut
 
-	Reg#(State) state <- mkReg(READY);
+	Reg#(State) rState <- mkReg(READY);
+	Reg#(State) wState <- mkReg(READY);
 
 	//Reg#(Bit#(16)) rowCounter <- mkReg(0); //counts up
-	Reg#(DDR2Address) ddrCounter <- mkReg(0);
-	Reg#(DDR2Address) ddrCounterOut <- mkReg(0);
+	Reg#(DDR2Address) rDdrCounter <- mkReg(0);
+	Reg#(DDR2Address) rDdrCounterOut <- mkReg(0);
+	Reg#(DDR2Address) wDdrCounter <- mkReg(0);
+	Reg#(DDR2Address) wDdrCounterOut <- mkReg(0);
 	Reg#(Bit#(32)) rburstCounter <- mkReg(0);
 	Reg#(Bit#(32)) wburstCounter <- mkReg(0);
 	Reg#(DDR2Data) wdataBuff <- mkReg(0);
@@ -93,40 +101,52 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 	//********************
 	//Rules
 	//********************
-	let currReq = rowReqQ.first();
-	//The DDR addr stop at. DDR2 is 64-bit addressible, in bursts of 4.
-	let ddrStartAddr  = (currReq.rowAddr) << (2 + log2(valueOf(DDR_REQ_PER_ROW)));
-	let ddrStopAddr = (currReq.rowAddr + currReq.numRows) << (2 + log2(valueOf(DDR_REQ_PER_ROW)));
+	let currReadReq = rowReadReqQ.first();
+	let currWriteReq = rowWriteReqQ.first();
 
-	rule acceptReq if (state == READY);
-		ddrCounter <= ddrStartAddr;
-		ddrCounterOut <= ddrStartAddr;
-		if (currReq.op == READ) begin
-			state <= READ_DDR;
-			$display("Marsh: acceptReq READ ddrStart=%x, ddrStop=%x", ddrStartAddr, ddrStopAddr);
-		end
-		else begin //WRITE
-			state <= WRITE_DDR;
-			$display("Marsh: acceptReq WRITE ddrStart=%x, ddrStop=%x", ddrStartAddr, ddrStopAddr);
-		end	
+	//The DDR addr stop at. DDR2 is 64-bit addressible, in bursts of 4.
+	let rDdrStartAddr  = (currReadReq.rowAddr) << (2 + log2(valueOf(DDR_REQ_PER_ROW)));
+	let rDdrStopAddr = (currReadReq.rowAddr + currReadReq.numRows) << (2 + log2(valueOf(DDR_REQ_PER_ROW)));
+
+	let wDdrStartAddr  = (currWriteReq.rowAddr) << (2 + log2(valueOf(DDR_REQ_PER_ROW)));
+	let wDdrStopAddr = (currWriteReq.rowAddr + currWriteReq.numRows) << (2 + log2(valueOf(DDR_REQ_PER_ROW)));
+
+	Bit#(32) dataOutFullCnt = dataOutEnqCnt - dataOutDeqCnt;
+	Bit#(32) dataOutEmptyCnt = fromInteger(2*valueOf(BURSTS_PER_ROW)) - dataOutFullCnt;
+
+
+	rule acceptReadReq if (rState == READY);
+		rDdrCounter <= rDdrStartAddr;
+		rDdrCounterOut <= rDdrStartAddr;
+		rState <= READ_DDR;
+		$display("Marsh: acceptReq READ ddrStart=%x, ddrStop=%x", rDdrStartAddr, rDdrStopAddr);
 	endrule
 
-	rule reqReadDDR if (state == READ_DDR && ddrCounter < ddrStopAddr);
+	rule reqReadDDR if (rState == READ_DDR && 
+						rDdrCounter < rDdrStopAddr && 
+						dataOutEmptyCnt >= fromInteger(valueOf(BURSTS_PER_DDR_DATA)));
+
+		$display("Marsh: read req DDR at addr=%x", rDdrCounter);
 		ddrReq.enq(DDR2Request{ writeen: 0,
-								address: ddrCounter,
+								address: rDdrCounter,
 								datain: ? //ignored for reads
 							});
-		ddrCounter <= ddrCounter + 4; //4 bursts of 64 bits
+		rDdrCounter <= rDdrCounter + 4; //4 bursts of 64 bits
+		//subtract to get many slots will be available in the fifo after this req
+		dataOutEnqCnt <= dataOutEnqCnt + fromInteger(valueOf(BURSTS_PER_DDR_DATA));
+		$display("dataOutEnqCnt=%d, deqcnt=%d", dataOutEnqCnt, dataOutDeqCnt);
 	endrule
 
-	rule readDDR if (state == READ_DDR);
-		if (ddrCounterOut < ddrStopAddr) begin
+	//IMPORTANT: always drain the read data before making more requests
+	(* descending_urgency = "readDDR, reqReadDDR" *)
+	rule readDDR if (rState == READ_DDR);
+		if (rDdrCounterOut < rDdrStopAddr) begin
 			DDR2Data resp = ddrResp.first();
 			//$display("Marsh: ddr chunk: %x", resp);
 			//send out in 8 burst of 32 bits
 			if (rburstCounter < fromInteger(valueOf(BURSTS_PER_DDR_DATA))) begin
 				DDR2Data resp_shift = resp << (rburstCounter<< valueOf(TLog#(BURST_WIDTH))); //shift by 32
-				dataOut[currReq.reqSrc].enq(truncateLSB(resp_shift));
+				dataOut[currReadReq.reqSrc].enq(truncateLSB(resp_shift));
 				//$display("Marsh: ddr chunk shifted: %x", resp_shift);
 				RowBurst dataR = truncate(resp_shift);
 				//$display("Marsh: reading data %x, burstCount=%d", dataR, rburstCounter);
@@ -135,37 +155,51 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 			else begin	//done with bursting a DDR response
 				ddrResp.deq();
 				rburstCounter <= 0;
-				ddrCounterOut <= ddrCounterOut + 4;
+				rDdrCounterOut <= rDdrCounterOut + 4;
 			end
 		end
 		else begin //done with all DDR responses
-			rowReqQ.deq();
-			state <= READY;
+			rowReadReqQ.deq();
+			rState <= READY;
 		end
 		
 	endrule
 
-	rule reqWriteDDR if (state == WRITE_DDR);
-		if (ddrCounter < ddrStopAddr) begin
+
+	rule acceptWriteReq if (wState == READY);
+		wDdrCounter <= wDdrStartAddr;
+		wDdrCounterOut <= wDdrStartAddr;
+		wState <= WRITE_DDR;
+		$display("Marsh: acceptReq WRITE ddrStart=%x, ddrStop=%x", wDdrStartAddr, wDdrStopAddr);
+	endrule
+
+
+
+	//IMPORTANT: prioritize writes over reads. This ensures no deadlock occurs. 
+	//Results will always drain
+	(* descending_urgency = "reqWriteDDR, reqReadDDR" *)
+	//(* descending_urgency = "reqReadDDR, reqWriteDDR" *)
+	rule reqWriteDDR if (wState == WRITE_DDR);
+		if (wDdrCounter < wDdrStopAddr) begin
 			if (wburstCounter < fromInteger(valueOf(BURSTS_PER_DDR_DATA))) begin
-				dataIn[currReq.reqSrc].deq();
+				dataIn[currWriteReq.reqSrc].deq();
 				//assemble write data
-				wdataBuff <= (wdataBuff<< valueOf(BURST_WIDTH)) | zeroExtend(dataIn[currReq.reqSrc].first());
+				wdataBuff <= (wdataBuff<< valueOf(BURST_WIDTH)) | zeroExtend(dataIn[currWriteReq.reqSrc].first());
 				wburstCounter <= wburstCounter+1;
 			end
 			else begin
 				$display("Marsh: writing ddr data: %x", wdataBuff);
 				ddrReq.enq(DDR2Request{ writeen: 32'hFFFFFFFF,
-										address: ddrCounter,
+										address: wDdrCounter,
 										datain: wdataBuff
 									});
-				ddrCounter <= ddrCounter + 4; //4 bursts of 64 bits
+				wDdrCounter <= wDdrCounter + 4; //4 bursts of 64 bits
 				wburstCounter <= 0;
 			end
 		end
 		else begin
-			rowReqQ.deq();
-			state <= READY;
+			rowWriteReqQ.deq();
+			wState <= READY;
 		end
 	endrule
 
@@ -182,11 +216,17 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 	begin
 		rowAcc[moduleInd] =interface ROW_ACCESS_IFC; 
 							method Action rowReq ( RowReq req );
-								rowReqQ.enq(req);
+								if (req.op == READ) begin
+									rowReadReqQ.enq(req);
+								end
+								else begin
+									rowWriteReqQ.enq(req);
+								end
 							endmethod
 							
 							method ActionValue#( RowBurst ) readResp();
 								dataOut[moduleInd].deq();
+								dataOutDeqCnt <= dataOutDeqCnt + 1;
 								return dataOut[moduleInd].first();
 							endmethod
 
