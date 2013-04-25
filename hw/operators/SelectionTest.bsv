@@ -8,6 +8,7 @@ import Connectable::*;
 import RowMarshaller::*;
 import Selection::*;
 import OperatorCommon::*;
+import ControllerTypes::*;
 import XilinxDDR2::*; 
 import DDR2::*;
 
