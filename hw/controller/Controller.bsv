@@ -17,8 +17,15 @@ interface RAController;
    interface Get#(RowAddr) getRowAck;
 endinterface
 
-module mkRAController #(OPERATOR_IFC selectionIfc) (RAController);
+module mkRAController #(OPERATOR_IFC selectionIfc, 
+						OPERATOR_IFC projectionIfc, 
+						OPERATOR_IFC unionIfc, 
+						OPERATOR_IFC diffIfc, 
+						OPERATOR_IFC xprodIfc, 
+						OPERATOR_IFC dedupIfc) (RAController);
+
    CmdBuffer cmdBuffer <- mkCmdBuffer();
+   Reg#(CmdEntry) currCmd <- mkRegU;
    Reg#(Index) buffSize <- mkRegU();
    Reg#(Index) cnt0 <- mkReg(0);
    Reg#(Index) cnt1 <- mkReg(0);
@@ -57,16 +64,34 @@ module mkRAController #(OPERATOR_IFC selectionIfc) (RAController);
    rule sendNextCmd if (state == SENDCMD);
       //$display("CmdEntry %d response", cnt1);
       let cmd <- cmdBuffer.resp.get();
+	  currCmd <= cmd;
       //IMPORTANT!::comment out next line to accelerate sim build
       $display(showCmd(cmd));
 
-	  //TODO figure out which operator to send the command	  
-	  selectionIfc.pushCommand(cmd);
+	  //push the command to the corresponding operator
+	  case (cmd.op) 
+		  SELECT: selectionIfc.pushCommand(cmd);
+		  PROJECT: projectionIfc.pushCommand(cmd);
+		  UNION: unionIfc.pushCommand(cmd);
+		  DIFFERENCE: diffIfc.pushCommand(cmd);
+		  XPROD: xprodIfc.pushCommand(cmd);
+		  DEDUP: dedupIfc.pushCommand(cmd);
+	  endcase
 	  state <= WAITCMD;
    endrule
 
    rule waitAckCmd if (state == WAITCMD);
-	  let numRows <- selectionIfc.getAckRows();
+      RowAddr numRows = 0;
+	  case (currCmd.op) 
+		  SELECT: numRows <- selectionIfc.getAckRows;
+		  PROJECT: numRows <- projectionIfc.getAckRows;
+		  UNION: numRows <- unionIfc.getAckRows;
+		  DIFFERENCE: numRows <- diffIfc.getAckRows;
+		  XPROD: numRows <- xprodIfc.getAckRows;
+		  DEDUP: numRows <- dedupIfc.getAckRows;
+	  endcase
+
+	  //let numRows <- selectionIfc.getAckRows();
 	  $display("Controller: cmd done, numRows=%d", numRows);
 	  if (cnt0 < buffSize) begin
 	  	state <= IDLE;

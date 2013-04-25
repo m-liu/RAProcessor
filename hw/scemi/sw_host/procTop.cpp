@@ -82,7 +82,7 @@ int main(int argc, char* argv[]){
 
 
 
-  //dumpMemory(rowReq, rdBurst);
+  dumpMemory(rowReq, rdBurst);
   /*
   for (uint32_t i=0; i<globalNextMeta; i++){
     printTable(i);

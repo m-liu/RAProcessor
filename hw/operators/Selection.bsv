@@ -93,7 +93,7 @@ module mkSelection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 				let predVal0 = getPredVal0(currCmd.clauses[p], rowBuff);
 				let predVal1 = getPredVal1(currCmd.clauses[p], rowBuff);
 				$display("row=%x", rowBuff);
-				$display("predVal0=%x, predVal1=%x", predVal0, predVal1);
+				$display("predVal0=%d, predVal1=%d", predVal0, predVal1);
 				if (evalPredicate (predVal0, predVal1, currCmd.clauses[p].op)) begin
 					$display("SELECT: predicate [%d] is true", p);
 					predResults[p] = 1; 

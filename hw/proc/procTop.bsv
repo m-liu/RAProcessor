@@ -11,6 +11,11 @@ import ControllerTypes::*;
 import OperatorCommon::*;
 
 import Selection::*;
+import Projection::*;
+import Union::*;
+import Difference::*;
+import Xprod::*;
+import Dedup::*;
 
 interface RAProcessor;
    interface ROW_ACCESS_IFC hostDataIO;
@@ -23,9 +28,14 @@ endinterface
 module [Module] mkRAProcessor(RAProcessor);
    ROW_MARSHALLER_IFC rowMarshaller <- mkRowMarshaller();
    
-   OPERATOR_IFC selection <- mkSelection(rowMarshaller.rowAccesses[valueOf(SELECTION_BLK)]);
+   OPERATOR_IFC selectionOp <- mkSelection(rowMarshaller.rowAccesses[valueOf(SELECTION_BLK)]);
+   OPERATOR_IFC projectionOp <- mkProjection(rowMarshaller.rowAccesses[valueOf(PROJECTION_BLK)]);
+   OPERATOR_IFC unionOp <- mkUnion(rowMarshaller.rowAccesses[valueOf(UNION_BLK)]);
+   OPERATOR_IFC diffOp <- mkDifference(rowMarshaller.rowAccesses[valueOf(DIFFERENCE_BLK)]);
+   OPERATOR_IFC xprodOp <- mkXprod(rowMarshaller.rowAccesses[valueOf(XPROD_BLK)]);
+   OPERATOR_IFC dedupOp <- mkDedup(rowMarshaller.rowAccesses[valueOf(DEDUP_BLK)]);
    
-   RAController raController <- mkRAController(selection);
+   RAController raController <- mkRAController(selectionOp, projectionOp, unionOp, diffOp, xprodOp, dedupOp);
 
    interface ROW_ACCESS_IFC hostDataIO = rowMarshaller.rowAccesses[valueOf(DATA_IO_BLK)];
    
