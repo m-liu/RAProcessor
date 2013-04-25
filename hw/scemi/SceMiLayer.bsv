@@ -53,6 +53,8 @@ module [SceMiModule] mkSceMiLayer(SceMiClockPortIfc clk_port, DDR2Client ifc);
    Empty wrBurst <- mkwrBurstXactor(dut, clk_port);
    Empty cmdBuffRequest <- mkPutXactor(dut.cmdBuffInit.request,  clk_port);
    Empty loadCmdBuffSize <- mkPutXactor(dut.loadCmdBuffSize, clk_port);
+
+   Empty getRowAck <- mkGetXactor(dut.getRowAck, clk_port);
    
     Empty shutdown <- mkShutdownXactor();
 

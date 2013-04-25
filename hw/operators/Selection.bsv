@@ -9,6 +9,7 @@ import Connectable::*;
 
 import OperatorCommon::*;
 import RowMarshaller::*;
+import ControllerTypes::*;
 
 typedef enum {SEL_IDLE, SEL_BUFFER_ROW, SEL_PROCESS_ROW, SEL_ACCEPT_ROW, SEL_WRITE_ROW, SEL_DONE_ROW} SelState deriving (Eq,Bits);
 
