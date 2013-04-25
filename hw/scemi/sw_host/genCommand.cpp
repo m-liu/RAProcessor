@@ -561,10 +561,12 @@ void loadCommands(InportProxyT<BuffInit> & cmdBuffRequest, CmdEntry_sw *cmdEntry
       
       uint32_t or_loc[MAX_CLAUSES/4-1];
       uint32_t and_loc[3*MAX_CLAUSES/4];
+      //uint32_t next_and_blk[MAX_CLAUSES/4-1];
       
       for (uint32_t ind_or = 0,ind_and = 0, j = 1; j < MAX_CLAUSES; j++){
 	if ( j % 4 == 0 )
 	  or_loc[ind_or++] = j;
+	
 	else
 	  and_loc[ind_and++] = j;
       }
@@ -598,19 +600,20 @@ void loadCommands(InportProxyT<BuffInit> & cmdBuffRequest, CmdEntry_sw *cmdEntry
 	  //(cmdEntry.m_con)[j].m_val = ClauseCon::e_AND;
 	  assert(ind_and < 3*MAX_CLAUSES/4);
 	  validClauseMask = validClauseMask + (1 << (and_loc[ind_and]));
-	  handle_clause(cmdEntry, cmdEntry_sw, and_loc[ind_and++], j);
+	  handle_clause(cmdEntry, cmdEntry_sw, and_loc[ind_and++], j+1);
 	  break;
 	case OR:
 	  //(cmdEntry.m_con)[j].m_val = ClauseCon::e_OR;
 	  assert(ind_or < MAX_CLAUSES/4-1);
+	  ind_and = (ind_and + 3) - (ind_and+3)%3;
 	  validClauseMask = validClauseMask + (1 << (or_loc[ind_or]));
-	  handle_clause(cmdEntry, cmdEntry_sw, or_loc[ind_or++], j);
+	  handle_clause(cmdEntry, cmdEntry_sw, or_loc[ind_or++], j+1);
 	  break;
 	default:
 	  break;
 	}
       }
-      
+      printf("validClauseMask: %x\n", validClauseMask);
       cmdEntry.m_validClauseMask = validClauseMask;
       break;
     case PROJECT:
