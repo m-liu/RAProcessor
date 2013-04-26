@@ -1,0 +1,1 @@
+../../../sim/input/cmds_star/q3.txt

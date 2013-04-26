@@ -1,0 +1,6 @@
+PROJECT,star3,star3i,iOrder
+PROJECT,star1,star1i,iOrder
+DIFFERENCE,star3i,star1i,starDiff
+RENAME,starDiff,0,iOrder0
+XPROD,starDiff,star2,starXprod
+SELECT,starXprod,starOut,iOrder0,=,iOrder,AND,pos_x,>,15,AND,pos_y,>,5

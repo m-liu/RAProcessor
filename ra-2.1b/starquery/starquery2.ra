@@ -16,3 +16,13 @@
 )
 
 );
+
+
+
+\select_{pos_x > 15 and pos_y > 5} (
+	\select_{iOrder0 = iOrder}(
+		( \rename_{iOrder0}(\project_{iOrder}(star3) \diff \project_{iOrder}(star1)) )
+			\cross
+		star2
+	)
+);
