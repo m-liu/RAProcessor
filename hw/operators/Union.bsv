@@ -1,4 +1,4 @@
-//xprod operator
+//union operator
 import ClientServer::*;
 import GetPut::*;
 import Vector::*;

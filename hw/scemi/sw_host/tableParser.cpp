@@ -43,7 +43,7 @@ vector<string> getTokens(string const &in){
   return container;
 }
 
-void loadChunk(uint32_t start_addr, uint32_t numRows, InportProxyT<RowReq> &rowReq, InportProxyT<RowBurst> &wrBurst){
+void loadChunk(uint32_t start_addr, uint32_t numRows, uint32_t numCols, InportProxyT<RowReq> &rowReq, InportProxyT<RowBurst> &wrBurst){
   RowReq request;
   MemOp wr_op;
   wr_op.m_val = MemOp::e_WRITE;
@@ -59,7 +59,12 @@ void loadChunk(uint32_t start_addr, uint32_t numRows, InportProxyT<RowReq> &rowR
     printf("\n");
     for (uint32_t j = 0; j < MAX_COLS; j++){
       printf("%d\t",rowChunk[i][j]);
-      wrBurst.sendMessage(rowChunk[i][j]);
+      if ( j < numCols){
+	wrBurst.sendMessage(rowChunk[i][j]);
+      }
+      else{
+	wrBurst.sendMessage(0);
+      }
     }
   }
 }
@@ -97,7 +102,7 @@ bool parsecsv(const char *filename, const uint32_t tb_num, const uint32_t start_
       break;
     default:
       if (chunk_ptr == MAX_ROWS_CHUNK){
-	loadChunk(mem_addr, chunk_ptr, rowReq, wrBurst);
+	loadChunk(mem_addr, chunk_ptr, globalTableMeta[tb_num].numCols, rowReq, wrBurst);
 	chunk_ptr = 0;
 	mem_addr += MAX_ROWS_CHUNK;
       }
@@ -116,7 +121,7 @@ bool parsecsv(const char *filename, const uint32_t tb_num, const uint32_t start_
       break;
     }
   }
-  loadChunk(mem_addr, chunk_ptr, rowReq, wrBurst);
+  loadChunk(mem_addr, chunk_ptr,globalTableMeta[tb_num].numCols, rowReq, wrBurst);
   globalTableMeta[tb_num].numRows = numRows;
   return true;
 }

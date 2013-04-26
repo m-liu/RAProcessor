@@ -1,4 +1,4 @@
-//projection operator
+//xprod operator
 import ClientServer::*;
 import GetPut::*;
 import Vector::*;
@@ -37,9 +37,14 @@ module mkXprod #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 	
    rule xprod_idle if (state == XPROD_IDLE);
       $display("IDLE");
-      //outer_rdBurstCnt <= 0;
       inputAddrCnt <= 0;
       outputAddrCnt <= 0;
+      outer_rdBurstCnt <= 0;
+      inner_rdBurstCnt <= 0;
+      wrBurstCnt <= 0;
+      table0ColCnt <= 0;
+      outer_rowCnt <= 0;
+      inner_rowCnt <= 0;
       total_rowCnt <= 0;
       state <= XPROD_OUTER_RD_REQ;
    endrule
@@ -140,7 +145,7 @@ module mkXprod #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 		     state <= XPROD_IDLE;
 		  end
 		  else begin
-		     outputAddrCnt <= outputAddrCnt + currCmd.table0numRows;
+		     outputAddrCnt <= outputAddrCnt + currCmd.table1numRows;
 		     state <= XPROD_OUTER_RD_REQ;
 		  end
 	       end

@@ -90,16 +90,18 @@ module mkDifference #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
    endrule
     
    rule process_row if (state == DIFFERENCE_PROCESS_ROW);
-      //$display("DIFFERENCE_PROCESS_ROW");
-      //$display(inner_rowCnt);
+      $display("DIFFERENCE_PROCESS_ROW");
+      $display(inner_rowCnt);
       //$display(inner_rdBurstCnt);
       //$display("match_found: %b", match_found);
       //$display("scan_rows: %b", scan_rows); 
       if ( inner_rowCnt < currCmd.table1numRows ) begin
 	 if ( inner_rdBurstCnt < fromInteger(valueOf(BURSTS_PER_ROW)) ) begin
 	    let rBurst <- rowIfc.readResp();
+	    $display("table 0 data %d", rowBuff[inner_rdBurstCnt]);
+	    $display("table 1 data %d", rBurst);
 	    if ( scan_rows &&& rBurst != rowBuff[inner_rdBurstCnt] ) begin
-	       //$display("mismatch found");
+	       $display("mismatch found");
 	       match_found <= False;
 	    end	 
 	    inner_rdBurstCnt <= inner_rdBurstCnt + 1;
@@ -109,18 +111,18 @@ module mkDifference #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 	    inner_rowCnt <= inner_rowCnt + 1;
 	    match_found <= True;
 	    if ( match_found == True ) begin
-	       //$display("matching row found");
+	       $display("matching row found");
 	       scan_rows <= False;
 	    end
 	 end
       end
       else begin
 	 if ( scan_rows ) begin
-	    //$display("no match found");
+	    $display("no match found");
 	    state <= DIFFERENCE_CP_TABLE0_WR_REQ;
 	 end
 	 else begin
-	    //$display("match found");
+	    $display("match found");
 	    state <= DIFFERENCE_CP_TABLE0_RD_REQ;
 	 end
       end	  
