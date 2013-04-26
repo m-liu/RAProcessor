@@ -25,6 +25,7 @@ interface RAProcessor;
    interface Get#(RowAddr) getRowAck;
 endinterface
 
+(* synthesize *)
 module [Module] mkRAProcessor(RAProcessor);
    ROW_MARSHALLER_IFC rowMarshaller <- mkRowMarshaller();
    

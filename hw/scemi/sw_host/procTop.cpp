@@ -12,6 +12,9 @@
 //#include "procModel.h"
 
 #include "SceMiHeaders.h"
+#include "ResetXactor.h"
+
+
 
 int main(int argc, char* argv[]){
   
@@ -30,8 +33,15 @@ int main(int argc, char* argv[]){
   OutportQueueT<RowAddr> getRowAck("", "scemi_m_getRowAck_outport", sceMi);
   ShutdownXactor shutdown("", "scemi_m_shutdown", sceMi);
 
+  // Initialize the reset port.
+  ResetXactor reset("", "scemi_m", sceMi);
+  
+
   // Service SceMi requests
   SceMiServiceThread *scemi_service_thread = new SceMiServiceThread(sceMi);
+
+  // Reset the dut.
+  reset.reset();
 
   /****Parsing Tables/Command*****/
   

@@ -63,7 +63,7 @@ typedef enum {READY, READ_DDR, WRITE_DDR} State deriving (Eq, Bits);
 //********************
 //Module
 //********************
-
+(* synthesize *)
 module mkRowMarshaller(ROW_MARSHALLER_IFC);
 
 	

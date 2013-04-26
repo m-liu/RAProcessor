@@ -33,6 +33,7 @@ import DDR2::*;
 import procTop::*;
 import RowMarshaller::*;
 import CmdBufferTypes::*;
+import ResetXactor::*;
 
 //import Dut::*;
 
@@ -41,7 +42,8 @@ typedef RAProcessor Dut;
 module [SceMiModule] mkSceMiLayer(SceMiClockPortIfc clk_port, DDR2Client ifc);
 
     //Dut dut <- buildDut(mkDut, clk_port);
-   Dut dut <- buildDut(mkRAProcessor, clk_port);
+   //Dut dut <- buildDut(mkRAProcessor, clk_port);
+   Dut dut <- buildDutWithSoftReset(mkRAProcessor, clk_port);
    
    /* 
    Empty request <- mkPutXactor(dut.request, clk_port);
