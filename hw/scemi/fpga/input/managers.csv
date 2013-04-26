@@ -1,6 +1,1 @@
-manager
-person_name, manager_name
-777, 999
-333, 111
-222, 777
-444, 888
+../../sim/input/managers.csv

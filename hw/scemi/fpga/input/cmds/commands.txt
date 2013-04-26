@@ -1,8 +1,1 @@
-SELECT,particles,tableOut,id,<,100,AND,weight,>,age,OR,sizex,<,20
-SELECT,tableOut,tableOut2,type,=,1
-PROJECT,particles,tableOutProj,id,sizez,age
-DEDUP,duptable,deduptable
-UNION,tableOut,tableOut2,tableOutU
-DIFFERENCE,tableOut,tableOut2,tableOutD
-XPROD,tableOutProj,particles,tableOutX
-RENAME,tableOutX,0,id0,9,testrename
+../../../sim/input/cmds/commands.txt

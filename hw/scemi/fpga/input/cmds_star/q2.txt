@@ -1,6 +1,1 @@
-XPROD,star1,star2,starXProd
-RENAME,starXProd,12,iOrder2,13,mass2,14,pos_x2,15,pos_y2,16,pos_z2,17,vx2,18,vy2,19,vz2,20,phi2,21,metals2,22,tform2,23,eps2
-SELECT,starXProd,starFiltered,pos_x,>,10,OR,pos_y,<,15,AND,pos_z2,>,12,OR,pos_x2,<=,40
-PROJECT,starFiltered,starOut,iOrder,iOrder2,pos_x,pos_y,pos_z,pos_x2,pos_y2,pos_z2
-PROJECT,starFiltered,starOut2,iOrder,pos_x,pos_y,pos_z
-DEDUP,starOut2,starOut3
+../../../sim/input/cmds_star/q2.txt

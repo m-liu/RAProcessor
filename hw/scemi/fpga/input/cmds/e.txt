@@ -1,10 +1,1 @@
-XPROD,lives,manager,tableOut0
-RENAME,tableOut0,3,manager_person_name
-SELECT,tableOut0,tableOut1,person_name,=,manager_person_name
-PROJECT,tableOut1,tableOut2,person_name,street,city,manager_name
-XPROD,tableOut2,lives,tableOut3
-RENAME,tableOut3,4,m_name,5,m_street,6,m_city
-SELECT,tableOut3,tableOut4,m_name,=,manager_name
-PROJECT,tableOut4,tableOut5,person_name,street,city,m_name,m_street,m_city
-SELECT,tableOut5,tableOut6,city,=,m_city,AND,street,=,m_street
-PROJECT,tableOut6,result,person_name
+../../../sim/input/cmds/e.txt
