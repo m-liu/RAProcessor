@@ -13,10 +13,14 @@ import ControllerTypes::*;
 typedef enum {PROJ_IDLE, PROJ_WR_REQ, PROJ_PROCESS_ROW, PROJ_DONE_ROW} ProjState deriving (Eq,Bits);
 				     
 
-module mkProjection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
+//module mkProjection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
+module mkProjection (OPERATOR_IFC);
 
    FIFO#(CmdEntry) cmdQ <- mkFIFO;
    FIFO#(RowAddr) ackRows <- mkFIFO;
+   FIFO#(RowReq) rowReqQ <- mkFIFO;
+   FIFO#(RowBurst) wdataQ <- mkFIFO;
+   FIFO#(RowBurst) rdataQ <- mkFIFO;
    Reg#(ProjState) state <- mkReg(PROJ_IDLE);
    //Reg#(Row) ouputBuff <- mkReg(0);
    Reg#(RowAddr) rdBurstCnt <- mkReg(0);
@@ -29,7 +33,7 @@ module mkProjection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 	
    rule reqRows if (state == PROJ_IDLE);
       //$display("PROJ_IDLE");
-      rowIfc.rowReq( RowReq{rowAddr: currCmd.table0Addr,
+      rowReqQ.enq( RowReq{rowAddr: currCmd.table0Addr,
 			    numRows: currCmd.table0numRows,
 			    reqSrc: fromInteger(valueOf(PROJECTION_BLK)), 
 			    op: READ } );
@@ -44,7 +48,7 @@ module mkProjection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
    
    rule write_req if (state == PROJ_WR_REQ);
       //$display("PROJ_WR_REQ");
-      rowIfc.rowReq( RowReq{rowAddr: currCmd.outputAddr,
+      rowReqQ.enq( RowReq{rowAddr: currCmd.outputAddr,
 			    numRows: currCmd.table0numRows,
 			    reqSrc: fromInteger(valueOf(PROJECTION_BLK)),
 			    op: WRITE });
@@ -53,9 +57,10 @@ module mkProjection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
    
    rule process_row if (state == PROJ_PROCESS_ROW);
       if (rdBurstCnt < fromInteger(valueOf(BURSTS_PER_ROW)) ) begin
-	 let rburst <- rowIfc.readResp();
+	 let rburst = rdataQ.first();
+	 rdataQ.deq();
 	 if ( colProjMask[0] == 1) begin
-	    rowIfc.writeData(rburst);
+	    wdataQ.enq(rburst);
 	    wrBurstCnt <= wrBurstCnt+1;
 	 end
 	 rdBurstCnt <= rdBurstCnt+1;
@@ -64,7 +69,7 @@ module mkProjection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
       end
       else begin
 	 if ( wrBurstCnt < fromInteger(valueOf(BURSTS_PER_ROW)) ) begin
-	    rowIfc.writeData(0);
+	    wdataQ.enq(0);
 	    wrBurstCnt <= wrBurstCnt+1;
 	 end
 	 else begin
@@ -81,14 +86,33 @@ module mkProjection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
    endrule
 
 
-   //interface definition
-   method Action pushCommand (CmdEntry cmdEntry);
-      cmdQ.enq(cmdEntry);
-   endmethod
 
-   method ActionValue#( Bit#(31) ) getAckRows();
-      ackRows.deq();
-      return ackRows.first();
-   endmethod
+	//Interface definitions. 
+	interface ROW_ACCESS_CLIENT_IFC rowIfc;
+		method ActionValue#(RowReq) rowReq();
+			rowReqQ.deq();
+			return rowReqQ.first();
+		endmethod
+		method Action readResp (RowBurst rData);
+			rdataQ.enq(rData);
+		endmethod
+		method ActionValue#(RowBurst) writeData();
+			wdataQ.deq();
+			return wdataQ.first();
+		endmethod
+	endinterface 
+
+	interface CMD_SERVER_IFC cmdIfc; 
+
+		//interface definition
+		method Action pushCommand (CmdEntry cmdEntry);
+			cmdQ.enq(cmdEntry);
+		endmethod
+
+		method ActionValue#( Bit#(31) ) getAckRows();
+			ackRows.deq();
+			return ackRows.first();
+		endmethod
+	endinterface
 
 endmodule

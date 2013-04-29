@@ -45,14 +45,21 @@ typedef struct {
 	MemOp op;
 } RowReq deriving (Eq,Bits);
 
-interface ROW_ACCESS_IFC;
-	method Action rowReq( RowReq req);
-	method ActionValue#( RowBurst ) readResp();
-	method Action writeData ( RowBurst wData );
+interface ROW_ACCESS_SERVER_IFC;
+	method Action rowReq (RowReq req);
+	method ActionValue#(RowBurst) readResp();
+	method Action writeData (RowBurst wData);
 endinterface
 
+interface ROW_ACCESS_CLIENT_IFC;
+	method ActionValue#(RowReq) rowReq();
+	method Action readResp (RowBurst rData);
+	method ActionValue#(RowBurst) writeData();
+endinterface
+
+
 interface ROW_MARSHALLER_IFC;
-	interface Vector#(NUM_MODULES, ROW_ACCESS_IFC) rowAccesses;
+	interface Vector#(NUM_MODULES, ROW_ACCESS_SERVER_IFC) rowAccesses;
 	interface DDR2Client ddrMem;
 endinterface
 
@@ -61,7 +68,7 @@ typedef enum {READY, READ_DDR, WRITE_DDR} State deriving (Eq, Bits);
 
 
 //********************
-//Module
+//Row Marshaller Module
 //********************
 (* synthesize *)
 module mkRowMarshaller(ROW_MARSHALLER_IFC);
@@ -210,11 +217,11 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 	//********************
 
 	//a vector of interfaces 
-	Vector#(NUM_MODULES, ROW_ACCESS_IFC) rowAcc = newVector();
+	Vector#(NUM_MODULES, ROW_ACCESS_SERVER_IFC) rowAcc = newVector();
 
 	for (Integer moduleInd = 0; moduleInd < valueOf(NUM_MODULES); moduleInd=moduleInd+1) 
 	begin
-		rowAcc[moduleInd] =interface ROW_ACCESS_IFC; 
+		rowAcc[moduleInd] =interface ROW_ACCESS_SERVER_IFC; 
 							method Action rowReq ( RowReq req );
 								if (req.op == READ) begin
 									rowReadReqQ.enq(req);
@@ -245,3 +252,21 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 
 
 endmodule
+
+
+
+//*******************************************************************
+// Define the client/server connection of the ROW_ACCESS interface
+//*******************************************************************
+
+instance Connectable#(ROW_ACCESS_SERVER_IFC, ROW_ACCESS_CLIENT_IFC);
+	module mkConnection#(ROW_ACCESS_SERVER_IFC serv, ROW_ACCESS_CLIENT_IFC cli)(Empty);
+		mkConnection(serv.rowReq, cli.rowReq);
+		mkConnection(cli.readResp, serv.readResp);
+		mkConnection(serv.writeData, cli.writeData);
+	endmodule
+endinstance
+
+
+
+

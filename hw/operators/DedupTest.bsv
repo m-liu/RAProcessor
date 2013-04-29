@@ -22,10 +22,13 @@ typedef 4 NUM_TESTS;
 module mkDedupTest();
    DDR2_User ddrServer <- mkDDR2Simulator();
    ROW_MARSHALLER_IFC marsh <- mkRowMarshaller();
-   OPERATOR_IFC xprod <- mkDedup(marsh.rowAccesses[valueOf(DEDUP_BLK)]);
+   OPERATOR_IFC xprod <- mkDedup();
 	
    //connect ddr and marshaller
    mkConnection(marsh.ddrMem, ddrServer);
+
+	//connect marshaller to operator
+	mkConnection(marsh.rowAccesses[valueOf(DEDUP_BLK)], xprod.rowIfc);
 
    //states
    Reg#(TestState) state <- mkReg(TEST_IDLE);
@@ -162,12 +165,12 @@ module mkDedupTest();
 			       //clauses: testClauses,
 			       //validClauseMask: 'h11 //OR
 						};
-      xprod.pushCommand(cmd);	
+      xprod.cmdIfc.pushCommand(cmd);	
       state <= TEST_WAIT;
    endrule
 
    rule waitSelect if (state == TEST_WAIT);
-      let respRows <- xprod.getAckRows();
+      let respRows <- xprod.cmdIfc.getAckRows();
       $display("Select done. Num rows = %d", respRows);
       //make req to print results
       RowReq req = RowReq{rowAddr: 50,

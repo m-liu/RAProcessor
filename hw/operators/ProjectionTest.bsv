@@ -22,10 +22,14 @@ typedef 4 NUM_TESTS;
 module mkProjectionTest();
    DDR2_User ddrServer <- mkDDR2Simulator();
    ROW_MARSHALLER_IFC marsh <- mkRowMarshaller();
-   OPERATOR_IFC projection <- mkProjection(marsh.rowAccesses[valueOf(PROJECTION_BLK)]);
+   OPERATOR_IFC projection <- mkProjection();
 	
    //connect ddr and marshaller
    mkConnection(marsh.ddrMem, ddrServer);
+
+	//connect marshaller to operator
+	mkConnection(marsh.rowAccesses[valueOf(PROJECTION_BLK)], projection.rowIfc);
+
 
    //states
    Reg#(TestState) state <- mkReg(TEST_IDLE);
@@ -140,12 +144,12 @@ module mkProjectionTest();
 			       //clauses: testClauses,
 			       //validClauseMask: 'h11 //OR
 						};
-      projection.pushCommand(cmd);	
+      projection.cmdIfc.pushCommand(cmd);	
       state <= TEST_WAIT;
    endrule
 
    rule waitSelect if (state == TEST_WAIT);
-      let respRows <- projection.getAckRows();
+      let respRows <- projection.cmdIfc.getAckRows();
       $display("Select done. Num rows = %d", respRows);
       //make req to print results
       RowReq req = RowReq{rowAddr: 50,

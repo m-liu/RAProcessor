@@ -13,10 +13,14 @@ import ControllerTypes::*;
 typedef enum {DIFFERENCE_IDLE, DIFFERENCE_CP_TABLE0_RD_REQ, DIFFERENCE_OUTER_BUFF_ROW, DIFFERENCE_PROCESS_ROW, DIFFERENCE_CP_TABLE0_WR_REQ, DIFFERENCE_CP_TABLE0_WR_ROW}  DifferenceState deriving (Eq,Bits);
 				     
 
-module mkDifference #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
+//module mkDifference #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
+module mkDifference (OPERATOR_IFC);
 
    FIFO#(CmdEntry) cmdQ <- mkFIFO;
    FIFO#(RowAddr) ackRows <- mkFIFO;
+	FIFO#(RowReq) rowReqQ <- mkFIFO;
+	FIFO#(RowBurst) wdataQ <- mkFIFO;
+	FIFO#(RowBurst) rdataQ <- mkFIFO;
    Reg#(DifferenceState) state <- mkReg(DIFFERENCE_IDLE);
    //Reg#(Row) ouputBuff <- mkReg(0);
    
@@ -54,7 +58,7 @@ module mkDifference #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
    rule outer_loop_rd_req if (state == DIFFERENCE_CP_TABLE0_RD_REQ);
       //$display("DIFFERENCE_CP_TABLE1_RD_REQ");
       if ( inputAddrCnt < currCmd.table0numRows ) begin
-	 rowIfc.rowReq( RowReq{rowAddr: currCmd.table0Addr + inputAddrCnt,
+	 rowReqQ.enq( RowReq{rowAddr: currCmd.table0Addr + inputAddrCnt,
 			       numRows: 1,
 			       reqSrc: fromInteger(valueOf(DIFFERENCE_BLK)),
 			       op: READ });
@@ -71,7 +75,8 @@ module mkDifference #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
    rule outer_loop_rd_resp if (state == DIFFERENCE_OUTER_BUFF_ROW);
       //$display("DIFFERENCE_OUTER_BUFF_ROW");
       if (outer_rdBurstCnt < fromInteger(valueOf(BURSTS_PER_ROW))) begin
-	 let rburst <- rowIfc.readResp();
+	 let rburst = rdataQ.first();
+	 rdataQ.deq();
 	 rowBuff[outer_rdBurstCnt] <= rburst;
 	 outer_rdBurstCnt <= outer_rdBurstCnt + 1;
       end
@@ -81,7 +86,7 @@ module mkDifference #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 	 inner_rowCnt <= 0;
 	 match_found <= True;
 	 scan_rows <= True;
-	 rowIfc.rowReq( RowReq{rowAddr: currCmd.table1Addr,
+	 rowReqQ.enq( RowReq{rowAddr: currCmd.table1Addr,
 			       numRows: currCmd.table1numRows,
 			       reqSrc: fromInteger(valueOf(DIFFERENCE_BLK)),
 			       op: READ });
@@ -97,7 +102,8 @@ module mkDifference #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
       //$display("scan_rows: %b", scan_rows); 
       if ( inner_rowCnt < currCmd.table1numRows ) begin
 	 if ( inner_rdBurstCnt < fromInteger(valueOf(BURSTS_PER_ROW)) ) begin
-	    let rBurst <- rowIfc.readResp();
+	    let rBurst = rdataQ.first();
+		rdataQ.deq();
 	    $display("table 0 data %d", rowBuff[inner_rdBurstCnt]);
 	    $display("table 1 data %d", rBurst);
 	    if ( scan_rows &&& rBurst != rowBuff[inner_rdBurstCnt] ) begin
@@ -129,7 +135,7 @@ module mkDifference #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
    endrule
    
    rule cp_table1_wr_req if ( state == DIFFERENCE_CP_TABLE0_WR_REQ);
-      rowIfc.rowReq(RowReq{rowAddr: currCmd.outputAddr + outputAddrCnt,
+      rowReqQ.enq(RowReq{rowAddr: currCmd.outputAddr + outputAddrCnt,
 			   numRows: 1,
 			   reqSrc: fromInteger(valueOf(DIFFERENCE_BLK)),
 			   op: WRITE });
@@ -139,7 +145,7 @@ module mkDifference #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
    
    rule cp_table1_wr_row if ( state == DIFFERENCE_CP_TABLE0_WR_ROW );
       if ( wrBurstCnt < fromInteger(valueOf(BURSTS_PER_ROW))) begin
-	 rowIfc.writeData(rowBuff[wrBurstCnt]);
+	 wdataQ.enq(rowBuff[wrBurstCnt]);
 	 wrBurstCnt <= wrBurstCnt + 1;
       end
       else begin
@@ -150,16 +156,34 @@ module mkDifference #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
    
 	 
    
+	//Interface definitions. 
+	interface ROW_ACCESS_CLIENT_IFC rowIfc;
+		method ActionValue#(RowReq) rowReq();
+			rowReqQ.deq();
+			return rowReqQ.first();
+		endmethod
+		method Action readResp (RowBurst rData);
+			rdataQ.enq(rData);
+		endmethod
+		method ActionValue#(RowBurst) writeData();
+			wdataQ.deq();
+			return wdataQ.first();
+		endmethod
+	endinterface 
+
+	interface CMD_SERVER_IFC cmdIfc; 
+
+		//interface definition
+		method Action pushCommand (CmdEntry cmdEntry);
+			cmdQ.enq(cmdEntry);
+		endmethod
+
+		method ActionValue#( Bit#(31) ) getAckRows();
+			ackRows.deq();
+			return ackRows.first();
+		endmethod
+	endinterface
 
 
-   //interface definition
-   method Action pushCommand (CmdEntry cmdEntry);
-      cmdQ.enq(cmdEntry);
-   endmethod
-
-   method ActionValue#( Bit#(31) ) getAckRows();
-      ackRows.deq();
-      return ackRows.first();
-   endmethod
 
 endmodule

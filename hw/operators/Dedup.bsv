@@ -13,10 +13,14 @@ import ControllerTypes::*;
 typedef enum {DEDUP_IDLE, DEDUP_CP_TABLE0_RD_REQ, DEDUP_OUTER_BUFF_ROW, DEDUP_PROCESS_ROW, DEDUP_CP_TABLE0_WR_REQ, DEDUP_CP_TABLE0_WR_ROW}  DedupState deriving (Eq,Bits);
 				     
 
-module mkDedup #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
+//module mkDedup #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
+module mkDedup (OPERATOR_IFC);
 
    FIFO#(CmdEntry) cmdQ <- mkFIFO;
    FIFO#(RowAddr) ackRows <- mkFIFO;
+	FIFO#(RowReq) rowReqQ <- mkFIFO;
+	FIFO#(RowBurst) wdataQ <- mkFIFO;
+	FIFO#(RowBurst) rdataQ <- mkFIFO;
    Reg#(DedupState) state <- mkReg(DEDUP_IDLE);
    //Reg#(Row) ouputBuff <- mkReg(0);
    
@@ -54,7 +58,7 @@ module mkDedup #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
    rule outer_loop_rd_req if (state == DEDUP_CP_TABLE0_RD_REQ);
       //$display("DEDUP_CP_TABLE1_RD_REQ");
       if ( inputAddrCnt < currCmd.table0numRows ) begin
-	 rowIfc.rowReq( RowReq{rowAddr: currCmd.table0Addr + inputAddrCnt,
+	 rowReqQ.enq( RowReq{rowAddr: currCmd.table0Addr + inputAddrCnt,
 			       numRows: 1,
 			       reqSrc: fromInteger(valueOf(DEDUP_BLK)),
 			       op: READ });
@@ -71,7 +75,8 @@ module mkDedup #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
    rule outer_loop_rd_resp if (state == DEDUP_OUTER_BUFF_ROW);
       //$display("DEDUP_OUTER_BUFF_ROW");
       if (outer_rdBurstCnt < fromInteger(valueOf(BURSTS_PER_ROW))) begin
-	 let rburst <- rowIfc.readResp();
+	 let rburst = rdataQ.first();
+	 rdataQ.deq();
 	 rowBuff[outer_rdBurstCnt] <= rburst;
 	 outer_rdBurstCnt <= outer_rdBurstCnt + 1;
       end
@@ -81,7 +86,7 @@ module mkDedup #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 	 inner_rowCnt <= 0;
 	 match_found <= True;
 	 scan_rows <= True;
-	 rowIfc.rowReq( RowReq{rowAddr: currCmd.table0Addr + inputAddrCnt,
+	 rowReqQ.enq( RowReq{rowAddr: currCmd.table0Addr + inputAddrCnt,
 			       numRows: currCmd.table0numRows - inputAddrCnt,
 			       reqSrc: fromInteger(valueOf(DEDUP_BLK)),
 			       op: READ });
@@ -97,7 +102,8 @@ module mkDedup #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
       //$display("scan_rows: %b", scan_rows); 
       if ( inner_rowCnt < currCmd.table0numRows - inputAddrCnt ) begin
 	 if ( inner_rdBurstCnt < fromInteger(valueOf(BURSTS_PER_ROW)) ) begin
-	    let rBurst <- rowIfc.readResp();
+	    let rBurst = rdataQ.first();
+		rdataQ.deq();
 	    if ( scan_rows &&& rBurst != rowBuff[inner_rdBurstCnt] ) begin
 	       //$display("mismatch found");
 	       match_found <= False;
@@ -127,7 +133,7 @@ module mkDedup #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
    endrule
    
    rule cp_table1_wr_req if ( state == DEDUP_CP_TABLE0_WR_REQ);
-      rowIfc.rowReq(RowReq{rowAddr: currCmd.outputAddr + outputAddrCnt,
+      rowReqQ.enq(RowReq{rowAddr: currCmd.outputAddr + outputAddrCnt,
 			   numRows: 1,
 			   reqSrc: fromInteger(valueOf(DEDUP_BLK)),
 			   op: WRITE });
@@ -137,7 +143,7 @@ module mkDedup #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
    
    rule cp_table1_wr_row if ( state == DEDUP_CP_TABLE0_WR_ROW );
       if ( wrBurstCnt < fromInteger(valueOf(BURSTS_PER_ROW))) begin
-	 rowIfc.writeData(rowBuff[wrBurstCnt]);
+	  wdataQ.enq(rowBuff[wrBurstCnt]);
 	 wrBurstCnt <= wrBurstCnt + 1;
       end
       else begin
@@ -150,14 +156,33 @@ module mkDedup #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
    
 
 
-   //interface definition
-   method Action pushCommand (CmdEntry cmdEntry);
-      cmdQ.enq(cmdEntry);
-   endmethod
+	//Interface definitions. 
+	interface ROW_ACCESS_CLIENT_IFC rowIfc;
+		method ActionValue#(RowReq) rowReq();
+			rowReqQ.deq();
+			return rowReqQ.first();
+		endmethod
+		method Action readResp (RowBurst rData);
+			rdataQ.enq(rData);
+		endmethod
+		method ActionValue#(RowBurst) writeData();
+			wdataQ.deq();
+			return wdataQ.first();
+		endmethod
+	endinterface 
 
-   method ActionValue#( Bit#(31) ) getAckRows();
-      ackRows.deq();
-      return ackRows.first();
-   endmethod
+	interface CMD_SERVER_IFC cmdIfc; 
+
+		//interface definition
+		method Action pushCommand (CmdEntry cmdEntry);
+			cmdQ.enq(cmdEntry);
+		endmethod
+
+		method ActionValue#( Bit#(31) ) getAckRows();
+			ackRows.deq();
+			return ackRows.first();
+		endmethod
+	endinterface
+
 
 endmodule
