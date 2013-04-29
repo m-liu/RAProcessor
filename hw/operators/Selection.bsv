@@ -43,10 +43,14 @@ function Bit#(32) getPredVal1(SelClause clause, Row rowBuff);
 	end
 endfunction
 
-module mkSelection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
+//module mkSelection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
+module mkSelection (OPERATOR_IFC);
 
 	FIFO#(CmdEntry) cmdQ <- mkFIFO;
 	FIFO#(RowAddr) ackRows <- mkFIFO;
+	FIFO#(RowReq) rowReqQ <- mkFIFO;
+	FIFO#(RowBurst) wdataQ <- mkFIFO;
+	FIFO#(RowBurst) rdataQ <- mkFIFO;
 	Reg#(SelState) state <- mkReg(SEL_IDLE);
 	Reg#(Row) rowBuff <- mkReg(0);
 	Reg#(RowAddr) rowBurstCnt <- mkReg(0);
@@ -58,7 +62,7 @@ module mkSelection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 	
 	//send req to read rows
 	rule reqRows if (state == SEL_IDLE);
-		rowIfc.rowReq( RowReq{ //rowAddr: currCmd.table0Addr + inputAddrCnt,
+		rowReqQ.enq( RowReq{ //rowAddr: currCmd.table0Addr + inputAddrCnt,
 								rowAddr: currCmd.table0Addr,
 								numRows: currCmd.table0numRows,
 								//numRows: 1,
@@ -72,7 +76,8 @@ module mkSelection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 	//buffer a whole row
 	rule bufferRow if (state == SEL_BUFFER_ROW);
 		if (rowBurstCnt < fromInteger(valueOf(BURSTS_PER_ROW)) ) begin
-			let rburst <- rowIfc.readResp();
+			let rburst = rdataQ.first();
+			rdataQ.deq();
 			rowBuff <= (rowBuff<< valueOf(BURST_WIDTH)) | zeroExtend(rburst);
 			rowBurstCnt <= rowBurstCnt+1;
 		end
@@ -125,7 +130,7 @@ module mkSelection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 	endrule
 	
 	rule acceptRow if (state == SEL_ACCEPT_ROW);
-		rowIfc.rowReq( RowReq{ rowAddr: currCmd.outputAddr + outputAddrCnt,
+		rowReqQ.enq( RowReq{ rowAddr: currCmd.outputAddr + outputAddrCnt,
 								//numRows: currCmd.table0numRows,
 								numRows: 1,
 								reqSrc: fromInteger(valueOf(SELECTION_BLK)), 
@@ -139,7 +144,7 @@ module mkSelection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 	rule writeRow if (state == SEL_WRITE_ROW);
 		if (rowBurstCnt < fromInteger(valueOf(BURSTS_PER_ROW) )) begin
 			rowBurstCnt <= rowBurstCnt + 1;
-			rowIfc.writeData ( truncateLSB(rowBuff)  );
+			wdataQ.enq ( truncateLSB(rowBuff)  );
 			rowBuff <= rowBuff << valueOf(BURST_WIDTH);
 		end 
 		else begin
@@ -166,16 +171,34 @@ module mkSelection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 	endrule
 
 
+	//Interface definitions. 
+	interface ROW_ACCESS_CLIENT_IFC rowIfc;
+		method ActionValue#(RowReq) rowReq();
+			rowReqQ.deq();
+			return rowReqQ.first();
+		endmethod
+		method Action readResp (RowBurst rData);
+			rdataQ.enq(rData);
+		endmethod
+		method ActionValue#(RowBurst) writeData();
+			wdataQ.deq();
+			return wdataQ.first();
+		endmethod
+	endinterface 
 
-	//interface definition
-	method Action pushCommand (CmdEntry cmdEntry);
-		cmdQ.enq(cmdEntry);
-	endmethod
+	interface CMD_SERVER_IFC cmdIfc; 
 
-	method ActionValue#( Bit#(31) ) getAckRows();
-		ackRows.deq();
-		return ackRows.first();
-	endmethod
+		//interface definition
+		method Action pushCommand (CmdEntry cmdEntry);
+			cmdQ.enq(cmdEntry);
+		endmethod
+
+		method ActionValue#( Bit#(31) ) getAckRows();
+			ackRows.deq();
+			return ackRows.first();
+		endmethod
+	endinterface
+
 
 endmodule
 

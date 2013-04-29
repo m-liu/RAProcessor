@@ -22,10 +22,13 @@ typedef 4 NUM_TESTS;
 module mkSelectionTest();
 	DDR2_User ddrServer <- mkDDR2Simulator();
 	ROW_MARSHALLER_IFC marsh <- mkRowMarshaller();
-	OPERATOR_IFC selection <- mkSelection(marsh.rowAccesses[valueOf(SELECTION_BLK)]);
+	OPERATOR_IFC selection <- mkSelection();
 	
 	//connect ddr and marshaller
 	mkConnection(marsh.ddrMem, ddrServer);
+
+	//connect marshaller to operator
+	mkConnection(marsh.rowAccesses[valueOf(SELECTION_BLK)], selection.rowIfc);
 
 	//states
 	Reg#(TestState) state <- mkReg(TEST_IDLE);
@@ -138,12 +141,12 @@ module mkSelectionTest();
 							clauses: testClauses,
 							validClauseMask: 'h11 //OR
 						};
-		selection.pushCommand(cmd);	
+		selection.cmdIfc.pushCommand(cmd);	
 		state <= TEST_WAIT;
 	endrule
 
 	rule waitSelect if (state == TEST_WAIT);
-		let respRows <- selection.getAckRows();
+		let respRows <- selection.cmdIfc.getAckRows();
 		$display("Select done. Num rows = %d", respRows);
 		//make req to print results
 		RowReq req = RowReq{ 	rowAddr: 50,
