@@ -14,7 +14,7 @@ typedef enum { TEST_IDLE, TEST_REQ, TEST_WR, TEST_RD, TEST_DONE } TestState deri
 
 
 //typedef 3 SEL_OP;
-typedef 4 NUM_TESTS;
+typedef 5 NUM_TESTS;
 
 module mkRowMarshallerTest();
 	DDR2_User ddrServer <- mkDDR2Simulator();
@@ -29,28 +29,53 @@ module mkRowMarshallerTest();
 	Reg#(Bit#(32)) reqInd <- mkReg(0);
 
 	//data
-	//Reg#(RowBurst) someData <- mkReg(32'hDEADBEEF);
-	Reg#(RowBurst) someData <- mkReg('hDEADBEEF);
+	Reg#(RowBurst) someData <- mkReg(32'hDEADBEEF);
+	//Reg#(RowBurst) someData <- mkReg('hFFFFFFE5);
 
 	//Requests
 	Vector#(NUM_TESTS, RowReq) testReq = newVector();
-	testReq[0] = RowReq{ 	rowAddr: 23,
-						  	numRows: 3,
+	testReq[0] = RowReq{ 	tableAddr: 23,
+							rowOffset: 0,
+						  	numRows: 5,
+							//numCols: fromInteger(valueOf(MAX_COLS)), 
+							numCols: 7, 
 							reqSrc: fromInteger(valueOf(SELECTION_BLK)),
+							reqType: REQ_NROWS,
 							op: WRITE };
-	testReq[1] = RowReq{ 	rowAddr: 23,
-						  	numRows: 3,
+	
+	testReq[1] = RowReq{ 	tableAddr: 23,
+							rowOffset: 5,
+						  	numRows: 8,
+							//numCols: fromInteger(valueOf(MAX_COLS)), 
+							numCols: 7, 
 							reqSrc: fromInteger(valueOf(SELECTION_BLK)),
+							reqType: REQ_EOT,
+							op: WRITE };
+
+
+	testReq[2] = RowReq{ 	tableAddr: 23,
+							rowOffset: 0,
+						  	numRows: ?,
+							numCols: fromInteger(valueOf(MAX_COLS)),
+							reqSrc: fromInteger(valueOf(SELECTION_BLK)),
+							reqType: REQ_ALLROWS,
+							op: READ };
+
+	testReq[3] = RowReq{ 	tableAddr: 23,
+							rowOffset: 0,
+						  	numRows: 3,
+							numCols: 5,
+							reqSrc: fromInteger(valueOf(SELECTION_BLK)),
+							reqType: REQ_NROWS,
 							op: READ };
 	
-	testReq[2] = RowReq{ 	rowAddr: 20,
-						  	numRows: 5,
-							reqSrc: fromInteger(valueOf(DEDUP_BLK)),
+	testReq[4] = RowReq{ 	tableAddr: 23,
+							rowOffset: 3,
+						  	numRows: 10,
+							numCols: fromInteger(valueOf(MAX_COLS)), 
+							reqSrc: fromInteger(valueOf(SELECTION_BLK)),
+							reqType: ?,
 							op: WRITE };
-	testReq[3] = RowReq{ 	rowAddr: 20,
-						  	numRows: 5,
-							reqSrc: fromInteger(valueOf(DEDUP_BLK)),
-							op: READ };
 
 	//send some requests
 	let currReq = testReq[reqInd];
@@ -60,11 +85,15 @@ module mkRowMarshallerTest();
 			$display("TB: sending req ind=%d", reqInd);
 
 			marsh.rowAccesses[currReq.reqSrc].rowReq(currReq);
-			if (currReq.op ==WRITE) begin
+			if (currReq.op ==WRITE && currReq.reqType != REQ_EOT) begin
 				state <= TEST_WR;
 			end
-			else begin
+			else if (currReq.op==READ) begin
 				state <= TEST_RD;
+			end
+			else if (currReq.op==WRITE && currReq.reqType == REQ_EOT) begin
+				reqInd <= reqInd+1;
+				state <= TEST_IDLE;
 			end
 		end
 		else begin
@@ -75,12 +104,16 @@ module mkRowMarshallerTest();
 	rule burstingWR if (state==TEST_WR);
 		$display("wburst [%d]: %x", brCount, someData);
 		marsh.rowAccesses[currReq.reqSrc].writeData (someData);
-		someData <= someData+1;
-		if (brCount == (currReq.numRows*fromInteger(valueOf(BURSTS_PER_ROW)))-1) begin
+		if (someData < 'hFFFFFFFF) begin
+			someData <= someData+1;
+		end
+
+		if (brCount == (currReq.numRows*currReq.numCols * fromInteger(valueOf(COLS_PER_BURST)))-1) begin
 			brCount <= 0;
 			state <= TEST_IDLE;
 			reqInd <= reqInd+1;
 			$display("TB: done sending bursts");
+			$display("******************");
 		end
 		else begin
 			brCount <= brCount+1;
@@ -88,17 +121,31 @@ module mkRowMarshallerTest();
 	endrule
 
 	rule burstingRD if (state==TEST_RD);
-		let rburst = marsh.rowAccesses[currReq.reqSrc].readResp;
+		let rburst <- marsh.rowAccesses[currReq.reqSrc].readResp;
 		$display("rburst [%d]: %x", brCount, rburst);
-		if (brCount == (currReq.numRows*fromInteger(valueOf(BURSTS_PER_ROW)))-1) begin
-		//if (brCount == currReq.numRows*32-1) begin
-			brCount <= 0;
-			state <= TEST_IDLE;
-			reqInd <= reqInd+1;
-			$display("TB: done reading bursts");
+		let totalBursts = currReq.numRows * currReq.numCols * fromInteger(valueOf(COLS_PER_BURST));
+
+		if (currReq.reqType == REQ_ALLROWS) begin
+			if (reduceAnd(rburst) == 1) begin
+			//if (brCount == currReq.numRows*32-1) begin
+				state <= TEST_IDLE;
+				reqInd <= reqInd+1;
+				$display("TB AR: done reading bursts");
+				$display("******************");
+			end
 		end
 		else begin
-			brCount <= brCount+1;
+			if (brCount == totalBursts-1) begin
+			//if (brCount == currReq.numRows*32-1) begin
+				brCount <= 0;
+				state <= TEST_IDLE;
+				reqInd <= reqInd+1;
+				$display("TB: done reading bursts");
+				$display("******************");
+			end
+			else begin
+				brCount <= brCount+1;
+			end
 		end
 	endrule
 	
