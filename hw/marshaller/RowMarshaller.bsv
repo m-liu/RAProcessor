@@ -186,7 +186,7 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 
 		//if beginning of table, add the number of bursts according to offset
 		if (rDdrCounter == rDdrStartAddr) begin
-			dataOutEnqCnt <= dataOutEnqCnt + fromInteger(valueOf(BURSTS_PER_DDR_DATA)) - rDdrStartOffset;
+			dataOutEnqCnt <= dataOutEnqCnt + fromInteger(valueOf(BURSTS_PER_DDR_DATA)) - zeroExtend(rDdrStartOffset);
 		end
 		else begin
 			//subtract to get many slots will be available in the fifo after this req
@@ -271,7 +271,7 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 		rDdrCounter <= rDdrCounter + 4; //4 bursts of 64 bits
 		//if beginning of table, add the number of bursts according to offset
 		if (rDdrCounter == rDdrStartAddr) begin
-			dataOutEnqCnt <= dataOutEnqCnt + fromInteger(valueOf(BURSTS_PER_DDR_DATA)) - rDdrStartOffset;
+			dataOutEnqCnt <= dataOutEnqCnt + fromInteger(valueOf(BURSTS_PER_DDR_DATA)) - zeroExtend(rDdrStartOffset);
 		end
 		else begin
 			//subtract to get many slots will be available in the fifo after this req
@@ -301,7 +301,7 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 				end
 				//if last DDR response, subtract the enqcnt
 				if (rDdrCounterOut == rDdrStopAddr-4) begin
-					dataOutEnqCnt <= dataOutEnqCnt - fromInteger(valueOf(BURSTS_PER_DDR_DATA)) + rDdrStopOffset;
+					dataOutEnqCnt <= dataOutEnqCnt - fromInteger(valueOf(BURSTS_PER_DDR_DATA)) + zeroExtend(rDdrStopOffset);
 				end
 
 				rburstCounter <= rburstCounter+1;
