@@ -29,7 +29,8 @@ module mkRowMarshallerTest();
 	Reg#(Bit#(32)) reqInd <- mkReg(0);
 
 	//data
-	Reg#(RowBurst) someData <- mkReg(32'hDEADBEEF);
+	//Reg#(RowBurst) someData <- mkReg(32'hDEADBEEF);
+	Reg#(RowBurst) someData <- mkReg(32'h0);
 	//Reg#(RowBurst) someData <- mkReg('hFFFFFFE5);
 
 	//Requests
@@ -37,7 +38,6 @@ module mkRowMarshallerTest();
 	testReq[0] = RowReq{ 	tableAddr: 23,
 							rowOffset: 0,
 						  	numRows: 5,
-							//numCols: fromInteger(valueOf(MAX_COLS)), 
 							numCols: 7, 
 							reqSrc: fromInteger(valueOf(SELECTION_BLK)),
 							reqType: REQ_NROWS,
@@ -46,43 +46,42 @@ module mkRowMarshallerTest();
 	testReq[1] = RowReq{ 	tableAddr: 23,
 							rowOffset: 5,
 						  	numRows: 8,
-							//numCols: fromInteger(valueOf(MAX_COLS)), 
 							numCols: 7, 
 							reqSrc: fromInteger(valueOf(SELECTION_BLK)),
 							reqType: REQ_EOT,
 							op: WRITE };
 
-
 	testReq[2] = RowReq{ 	tableAddr: 23,
+							rowOffset: 3,
+						  	numRows: 1,
+							numCols: 7, 
+							reqSrc: fromInteger(valueOf(SELECTION_BLK)),
+							reqType: REQ_NROWS,
+							op: WRITE };
+
+
+	testReq[3] = RowReq{ 	tableAddr: 23,
 							rowOffset: 0,
 						  	numRows: ?,
-							numCols: fromInteger(valueOf(MAX_COLS)),
+							numCols: 7,
 							reqSrc: fromInteger(valueOf(SELECTION_BLK)),
 							reqType: REQ_ALLROWS,
 							op: READ };
 
-	testReq[3] = RowReq{ 	tableAddr: 23,
-							rowOffset: 0,
-						  	numRows: 3,
-							numCols: 5,
+	testReq[4] = RowReq{ 	tableAddr: 23,
+							rowOffset: 3,
+						  	numRows: 2,
+							numCols: 7,
 							reqSrc: fromInteger(valueOf(SELECTION_BLK)),
 							reqType: REQ_NROWS,
 							op: READ };
-	
-	testReq[4] = RowReq{ 	tableAddr: 23,
-							rowOffset: 3,
-						  	numRows: 10,
-							numCols: fromInteger(valueOf(MAX_COLS)), 
-							reqSrc: fromInteger(valueOf(SELECTION_BLK)),
-							reqType: ?,
-							op: WRITE };
+
 
 	//send some requests
 	let currReq = testReq[reqInd];
 	rule sendReqs if (state==TEST_IDLE);
 		if (reqInd < fromInteger(valueOf(NUM_TESTS))) begin
-		
-			$display("TB: sending req ind=%d", reqInd);
+			$display(">>>>>> TB: sending req ind=%d", reqInd);
 
 			marsh.rowAccesses[currReq.reqSrc].rowReq(currReq);
 			if (currReq.op ==WRITE && currReq.reqType != REQ_EOT) begin
@@ -97,7 +96,8 @@ module mkRowMarshallerTest();
 			end
 		end
 		else begin
-			$finish;
+			//$display("ALL DONE");
+			//$finish;
 		end
 	endrule
 
@@ -113,7 +113,6 @@ module mkRowMarshallerTest();
 			state <= TEST_IDLE;
 			reqInd <= reqInd+1;
 			$display("TB: done sending bursts");
-			$display("******************");
 		end
 		else begin
 			brCount <= brCount+1;
@@ -131,7 +130,6 @@ module mkRowMarshallerTest();
 				state <= TEST_IDLE;
 				reqInd <= reqInd+1;
 				$display("TB AR: done reading bursts");
-				$display("******************");
 			end
 		end
 		else begin
@@ -141,7 +139,6 @@ module mkRowMarshallerTest();
 				state <= TEST_IDLE;
 				reqInd <= reqInd+1;
 				$display("TB: done reading bursts");
-				$display("******************");
 			end
 			else begin
 				brCount <= brCount+1;

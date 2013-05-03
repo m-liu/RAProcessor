@@ -152,6 +152,13 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 	Bit#(32) dataOutFullCnt = dataOutEnqCnt - dataOutDeqCnt;
 	Bit#(32) dataOutEmptyCnt = fromInteger(2*valueOf(BURSTS_PER_ROW)) - dataOutFullCnt;
 
+	Reg#(Bit#(32)) prevDataOutFullCnt <- mkReg(0);
+
+	rule debugCntPrint if (prevDataOutFullCnt != dataOutFullCnt);
+		prevDataOutFullCnt <= dataOutFullCnt;
+		$display("-- dataOutFullCnt=%d", dataOutFullCnt);
+	endrule
+
 
 	rule acceptReadReq if (rState == READY);
 		if (currReadReq.reqType == REQ_ALLROWS) begin
@@ -214,7 +221,8 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 					endOfTable <= True;
 					dataOut[currReadReq.reqSrc].enq(truncRespShift);
 					$display("Marsh AR: reading (last) data %x, burstCount=%d", truncRespShift, rburstCounter);
-					dataOutEnqCnt <= dataOutEnqCnt - fromInteger(valueOf(BURSTS_PER_DDR_DATA)) + rburstCounter; 
+					//+1 for the last burst of 1's
+					dataOutEnqCnt <= dataOutEnqCnt - fromInteger(valueOf(BURSTS_PER_DDR_DATA)) + rburstCounter + 1; 
 					ddrResp.deq();
 					rDdrCounterOut <= rDdrCounterOut + 4;
 					$display("End of table reached, cntOut=%d, cnt=%d", rDdrCounterOut+4, rDdrCounter);
@@ -299,16 +307,16 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 					RowBurst dataR = truncateLSB(resp_shift);
 					$display("Marsh: reading data %x, burstCount=%d", dataR, rburstCounter);
 				end
-				//if last DDR response, subtract the enqcnt
-				if (rDdrCounterOut == rDdrStopAddr-4) begin
-					dataOutEnqCnt <= dataOutEnqCnt - fromInteger(valueOf(BURSTS_PER_DDR_DATA)) + zeroExtend(rDdrStopOffset);
-				end
 
 				rburstCounter <= rburstCounter+1;
 			end
 			else begin	//done with bursting a DDR response
 				ddrResp.deq();
-				dataOutEnqCnt <= dataOutEnqCnt - fromInteger(valueOf(BURSTS_PER_DDR_DATA));
+				//if last DDR response, subtract the enqcnt
+				if (rDdrCounterOut == rDdrStopAddr-4) begin
+					dataOutEnqCnt <= dataOutEnqCnt - fromInteger(valueOf(BURSTS_PER_DDR_DATA)) + zeroExtend(rDdrStopOffset) + 1;
+				end
+				//dataOutEnqCnt <= dataOutEnqCnt - fromInteger(valueOf(BURSTS_PER_DDR_DATA));
 				rburstCounter <= 0;
 				rDdrCounterOut <= rDdrCounterOut + 4;
 			end
