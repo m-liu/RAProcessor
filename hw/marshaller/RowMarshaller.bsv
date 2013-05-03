@@ -183,8 +183,16 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 								datain: ? //ignored for reads
 							});
 		rDdrCounter <= rDdrCounter + 4; //4 bursts of 64 bits
-		//subtract to get many slots will be available in the fifo after this req
-		dataOutEnqCnt <= dataOutEnqCnt + fromInteger(valueOf(BURSTS_PER_DDR_DATA));
+
+		//if beginning of table, add the number of bursts according to offset
+		if (rDdrCounter == rDdrStartAddr) begin
+			dataOutEnqCnt <= dataOutEnqCnt + fromInteger(valueOf(BURSTS_PER_DDR_DATA)) - rDdrStartOffset;
+		end
+		else begin
+			//subtract to get many slots will be available in the fifo after this req
+			dataOutEnqCnt <= dataOutEnqCnt + fromInteger(valueOf(BURSTS_PER_DDR_DATA));
+		end
+
 		$display("dataOutEnqCnt=%d, deqcnt=%d", dataOutEnqCnt, dataOutDeqCnt);
 	endrule
 
@@ -206,11 +214,12 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 					endOfTable <= True;
 					dataOut[currReadReq.reqSrc].enq(truncRespShift);
 					$display("Marsh AR: reading (last) data %x, burstCount=%d", truncRespShift, rburstCounter);
+					dataOutEnqCnt <= dataOutEnqCnt - fromInteger(valueOf(BURSTS_PER_DDR_DATA)) + rburstCounter; 
 					ddrResp.deq();
 					rDdrCounterOut <= rDdrCounterOut + 4;
 					$display("End of table reached, cntOut=%d, cnt=%d", rDdrCounterOut+4, rDdrCounter);
 				end
-				//If first DDR response, start enq at offset
+				//Enq rest of table; If first DDR response, start enq at offset
 				else if (rDdrCounterOut > rDdrStartAddr || rburstCounter >= zeroExtend(rDdrStartOffset)) begin
 					dataOut[currReadReq.reqSrc].enq(truncRespShift);
 					$display("Marsh AR: ddr chunk shifted: %x", resp_shift);
@@ -234,6 +243,7 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 		//drain the rest of the responses
 		else if (endOfTable == True && rDdrCounterOut < rDdrCounter) begin
 			$display("Marsh AR: drained DDR burst");
+			dataOutEnqCnt <= dataOutEnqCnt - fromInteger(valueOf(BURSTS_PER_DDR_DATA));
 			ddrResp.deq();
 			rDdrCounterOut <= rDdrCounterOut + 4;
 		end
@@ -259,8 +269,14 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 								datain: ? //ignored for reads
 							});
 		rDdrCounter <= rDdrCounter + 4; //4 bursts of 64 bits
-		//subtract to get many slots will be available in the fifo after this req
-		dataOutEnqCnt <= dataOutEnqCnt + fromInteger(valueOf(BURSTS_PER_DDR_DATA));
+		//if beginning of table, add the number of bursts according to offset
+		if (rDdrCounter == rDdrStartAddr) begin
+			dataOutEnqCnt <= dataOutEnqCnt + fromInteger(valueOf(BURSTS_PER_DDR_DATA)) - rDdrStartOffset;
+		end
+		else begin
+			//subtract to get many slots will be available in the fifo after this req
+			dataOutEnqCnt <= dataOutEnqCnt + fromInteger(valueOf(BURSTS_PER_DDR_DATA));
+		end
 		$display("dataOutEnqCnt=%d, deqcnt=%d", dataOutEnqCnt, dataOutDeqCnt);
 	endrule
 
@@ -283,10 +299,16 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 					RowBurst dataR = truncateLSB(resp_shift);
 					$display("Marsh: reading data %x, burstCount=%d", dataR, rburstCounter);
 				end
+				//if last DDR response, subtract the enqcnt
+				if (rDdrCounterOut == rDdrStopAddr-4) begin
+					dataOutEnqCnt <= dataOutEnqCnt - fromInteger(valueOf(BURSTS_PER_DDR_DATA)) + rDdrStopOffset;
+				end
+
 				rburstCounter <= rburstCounter+1;
 			end
 			else begin	//done with bursting a DDR response
 				ddrResp.deq();
+				dataOutEnqCnt <= dataOutEnqCnt - fromInteger(valueOf(BURSTS_PER_DDR_DATA));
 				rburstCounter <= 0;
 				rDdrCounterOut <= rDdrCounterOut + 4;
 			end
