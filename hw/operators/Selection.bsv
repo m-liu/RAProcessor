@@ -11,7 +11,7 @@ import OperatorCommon::*;
 import RowMarshaller::*;
 import ControllerTypes::*;
 
-typedef enum {SEL_IDLE, SEL_BUFFER_ROW, SEL_PROCESS_ROW, SEL_ACCEPT_ROW, SEL_WRITE_ROW, SEL_DONE_ROW} SelState deriving (Eq,Bits);
+typedef enum {SEL_IDLE, SEL_BUFFER_ROW, SEL_PROCESS_ROW, SEL_ACCEPT_ROW, SEL_WRITE_ROW, SEL_DONE_TABLE} SelState deriving (Eq,Bits);
 
 function Bool evalPredicate(Bit#(32) val1, Bit#(32) val2, CompOp op); 
 	case (op)
@@ -63,10 +63,12 @@ module mkSelection (OPERATOR_IFC);
 	//send req to read rows
 	rule reqRows if (state == SEL_IDLE);
 		rowReqQ.enq( RowReq{ //rowAddr: currCmd.table0Addr + inputAddrCnt,
-								rowAddr: currCmd.table0Addr,
+								tableAddr: currCmd.table0Addr,
+								rowOffset: 0,
 								numRows: currCmd.table0numRows,
-								//numRows: 1,
-								reqSrc: fromInteger(valueOf(SELECTION_BLK)), 
+								numCols: currCmd.table0numCols,
+								reqSrc: fromInteger(valueOf(SELECTION_BLK)),
+								reqType: REQ_ALLROWS,
 								op: READ } );
 		rowBuff <= 0;
 		rowBurstCnt <= 0;
@@ -75,13 +77,27 @@ module mkSelection (OPERATOR_IFC);
 
 	//buffer a whole row
 	rule bufferRow if (state == SEL_BUFFER_ROW);
-		if (rowBurstCnt < fromInteger(valueOf(BURSTS_PER_ROW)) ) begin
+		if (rowBurstCnt < currCmd.table0numCols) begin
 			let rburst = rdataQ.first();
+			$display("SELECT: rburst=%x", rburst);
 			rdataQ.deq();
-			rowBuff <= (rowBuff<< valueOf(BURST_WIDTH)) | zeroExtend(rburst);
-			rowBurstCnt <= rowBurstCnt+1;
+
+			if ( reduceAnd(rburst) == 1) begin
+				$display("SELECT: entering SEL_DONE_TABLE, rowBurstCnt=%d", rowBurstCnt);
+				state <= SEL_DONE_TABLE;
+			end
+			else begin
+				rowBuff <= (rowBuff<< valueOf(BURST_WIDTH)) | zeroExtend(rburst);
+				rowBurstCnt <= rowBurstCnt+1;
+			end
 		end
 		else begin
+			$display("SELECT: rowShifted=%x", rowBuff);
+			//shift the row buff to align to MSB dep on how many columns there are
+			RowAddr shiftVal = fromInteger(valueOf(MAX_COLS)) - currCmd.table0numCols;
+			Row shiftedRow = rowBuff << (shiftVal * fromInteger(valueOf(COL_WIDTH)));
+
+			rowBuff <= shiftedRow;
 			rowBurstCnt <= 0;
 			inputAddrCnt <= inputAddrCnt + 1;
 			state <= SEL_PROCESS_ROW;
@@ -97,8 +113,8 @@ module mkSelection (OPERATOR_IFC);
 			if (currCmd.validClauseMask[p] == 1) begin
 				let predVal0 = getPredVal0(currCmd.clauses[p], rowBuff);
 				let predVal1 = getPredVal1(currCmd.clauses[p], rowBuff);
-				$display("row=%x", rowBuff);
-				$display("predVal0=%d, predVal1=%d", predVal0, predVal1);
+				$display("SELECT: row=%x", rowBuff);
+				$display("SELECT: predVal0=%d, predVal1=%d", predVal0, predVal1);
 				if (evalPredicate (predVal0, predVal1, currCmd.clauses[p].op)) begin
 					$display("SELECT: predicate [%d] is true", p);
 					predResults[p] = 1; 
@@ -121,7 +137,8 @@ module mkSelection (OPERATOR_IFC);
 			$display("SELECT: row %d accepted", inputAddrCnt-1);
 		end
 		else begin
-			state <= SEL_DONE_ROW;
+//			state <= SEL_DONE_ROW;
+			state <= SEL_BUFFER_ROW;
 			$display("SELECT: row %d rejected", inputAddrCnt-1);
 		end
 		
@@ -130,10 +147,13 @@ module mkSelection (OPERATOR_IFC);
 	endrule
 	
 	rule acceptRow if (state == SEL_ACCEPT_ROW);
-		rowReqQ.enq( RowReq{ rowAddr: currCmd.outputAddr + outputAddrCnt,
-								//numRows: currCmd.table0numRows,
+		rowReqQ.enq( RowReq{ 
+								tableAddr: currCmd.outputAddr,
+								rowOffset: outputAddrCnt,
 								numRows: 1,
+								numCols: currCmd.table0numCols,
 								reqSrc: fromInteger(valueOf(SELECTION_BLK)), 
+								reqType: REQ_NROWS,
 								op: WRITE } );
 		outputAddrCnt <= outputAddrCnt + 1;
 		
@@ -142,31 +162,35 @@ module mkSelection (OPERATOR_IFC);
 	endrule
 
 	rule writeRow if (state == SEL_WRITE_ROW);
-		if (rowBurstCnt < fromInteger(valueOf(BURSTS_PER_ROW) )) begin
+		if (rowBurstCnt < currCmd.table0numCols ) begin
 			rowBurstCnt <= rowBurstCnt + 1;
 			wdataQ.enq ( truncateLSB(rowBuff)  );
 			rowBuff <= rowBuff << valueOf(BURST_WIDTH);
 		end 
 		else begin
 			rowBurstCnt <= 0;
-			state <= SEL_DONE_ROW;
+			//state <= SEL_DONE_ROW;
+			state <= SEL_BUFFER_ROW;
 		end
 		
 	endrule
 
-	rule doneRow if (state == SEL_DONE_ROW);
-		//ack, deq cmdQ
-		if (inputAddrCnt >= currCmd.table0numRows) begin
-			inputAddrCnt <= 0;
-			cmdQ.deq();
-			ackRows.enq(outputAddrCnt);
-			outputAddrCnt <= 0;
-			state <= SEL_IDLE;
-		end
-		else begin
-			state <= SEL_BUFFER_ROW;
-		end
-		
+	rule doneTable if (state == SEL_DONE_TABLE);
+		$display("SELECT: done with table");
+		//ack, deq cmdQ, write EOT marker
+		rowReqQ.enq( RowReq{
+							tableAddr: currCmd.outputAddr,
+							rowOffset: outputAddrCnt,
+							numRows: 8,
+							numCols: currCmd.table0numCols,
+							reqSrc: fromInteger(valueOf(SELECTION_BLK)),
+							reqType: REQ_EOT,
+							op: WRITE} );
+		inputAddrCnt <= 0;
+		cmdQ.deq();
+		ackRows.enq(outputAddrCnt);
+		outputAddrCnt <= 0;
+		state <= SEL_IDLE;
 
 	endrule
 

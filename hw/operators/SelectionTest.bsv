@@ -34,22 +34,39 @@ module mkSelectionTest();
 	Reg#(TestState) state <- mkReg(TEST_IDLE);
 	Reg#(Bit#(31)) brCount <- mkReg(0);
 	Reg#(Bit#(32)) reqInd <- mkReg(0);
-
+	Reg#(Bit#(32)) printColCnt <- mkReg(0);
+	Reg#(Bit#(32)) printRowCnt <- mkReg(0);
 	//data
 	//Reg#(RowBurst) someData <- mkReg(32'hDEADBEEF);
 	Reg#(RowBurst) someData <- mkReg('hDEADBEEF);
 
 	//Requests
 	Vector#(NUM_TESTS, RowReq) testReq = newVector();
-	testReq[0] = RowReq{ 	rowAddr: 23,
+	testReq[0] = RowReq{ 	tableAddr: 23,
+							rowOffset: 0,
 						  	numRows: 20,
+							numCols: 7, 
 							reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
+							reqType: REQ_NROWS,
 							op: WRITE };
-	testReq[1] = RowReq{ 	rowAddr: 23,
-						  	numRows: 20,
-							reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
-							op: READ };
 	
+	testReq[1] = RowReq{ 	tableAddr: 23,
+							rowOffset: 20,
+						  	numRows: 8,
+							numCols: 7, 
+							reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
+							reqType: REQ_EOT,
+							op: WRITE };
+
+	testReq[3] = RowReq{ 	tableAddr: 23,
+							rowOffset: 0,
+						  	numRows: ?,
+							numCols: 7,
+							reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
+							reqType: REQ_ALLROWS,
+							op: READ };
+
+/*	
 	testReq[2] = RowReq{ 	rowAddr: 10,
 						  	numRows: 5,
 							reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
@@ -58,20 +75,24 @@ module mkSelectionTest();
 						  	numRows: 5,
 							reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
 							op: READ };
-
+*/
 	//send some requests
 	let currReq = testReq[reqInd];
 	rule sendReqs if (state==TEST_IDLE);
 		if (reqInd < fromInteger(valueOf(NUM_TESTS))) begin
 		
-			$display("TB: sending req ind=%d", reqInd);
+			$display(">>>>> TB: sending req ind=%d", reqInd);
 
 			marsh.rowAccesses[currReq.reqSrc].rowReq(currReq);
 			if (currReq.op ==WRITE) begin
 				state <= TEST_WR;
 			end
-			else begin
+			else if (currReq.op==READ) begin
 				state <= TEST_RD;
+			end
+			else if (currReq.op==WRITE && currReq.reqType == REQ_EOT) begin
+				reqInd <= reqInd+1;
+				state <= TEST_IDLE;
 			end
 		end
 		else begin
@@ -84,7 +105,7 @@ module mkSelectionTest();
 		$display("wburst [%d]: %x", brCount, someData);
 		marsh.rowAccesses[currReq.reqSrc].writeData (someData);
 		someData <= someData+1;
-		if (brCount == (currReq.numRows*fromInteger(valueOf(BURSTS_PER_ROW)))-1) begin
+		if (brCount == (currReq.numRows*currReq.numCols * fromInteger(valueOf(COLS_PER_BURST)))-1) begin
 			brCount <= 0;
 			state <= TEST_IDLE;
 			reqInd <= reqInd+1;
@@ -96,23 +117,35 @@ module mkSelectionTest();
 	endrule
 
 	rule burstingRD if (state==TEST_RD);
-		let rburst = marsh.rowAccesses[currReq.reqSrc].readResp;
+		let rburst <- marsh.rowAccesses[currReq.reqSrc].readResp;
 		$display("rburst [%d]: %x", brCount, rburst);
-		if (brCount == (currReq.numRows*fromInteger(valueOf(BURSTS_PER_ROW)))-1) begin
-		//if (brCount == currReq.numRows*32-1) begin
-			brCount <= 0;
-			state <= TEST_IDLE;
-			reqInd <= reqInd+1;
-			$display("TB: done reading bursts");
+		let totalBursts = currReq.numRows * currReq.numCols * fromInteger(valueOf(COLS_PER_BURST));
+
+		if (currReq.reqType == REQ_ALLROWS) begin
+			if (reduceAnd(rburst) == 1) begin
+			//if (brCount == currReq.numRows*32-1) begin
+				state <= TEST_IDLE;
+				reqInd <= reqInd+1;
+				$display("TB AR: done reading bursts");
+			end
 		end
 		else begin
-			brCount <= brCount+1;
+			if (brCount == totalBursts-1) begin
+			//if (brCount == currReq.numRows*32-1) begin
+				brCount <= 0;
+				state <= TEST_IDLE;
+				reqInd <= reqInd+1;
+				$display("TB: done reading bursts");
+			end
+			else begin
+				brCount <= brCount+1;
+			end
 		end
 	endrule
 	
 
 	rule testSelect if (state==TEST_SELECT);
-
+		$display("\n\n ***** STARTING SELECTION TEST ****** \n");
 		Vector#(MAX_CLAUSES, SelClause) testClauses = newVector();
 
 		//col [1] > DEADBEFF
@@ -136,7 +169,7 @@ module mkSelectionTest();
 							op: SELECT,
 							table0Addr: 23,
 							table0numRows: 20,
-							table0numCols: 32, //just use max for now
+							table0numCols: 7, 
 							outputAddr: 50, 
 							clauses: testClauses,
 							validClauseMask: 'h11 //OR
@@ -149,27 +182,35 @@ module mkSelectionTest();
 		let respRows <- selection.cmdIfc.getAckRows();
 		$display("Select done. Num rows = %d", respRows);
 		//make req to print results
-		RowReq req = RowReq{ 	rowAddr: 50,
-						  	numRows: 20,
+		RowReq req = RowReq{ 	tableAddr: 50,
+							rowOffset: 0,
+						  	numRows: ?,
+							numCols: 7,
 							reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
+							reqType: REQ_ALLROWS,
 							op: READ };
 		marsh.rowAccesses[valueOf(DATA_IO_BLK)].rowReq(req);
 		state <= TEST_PRINT;
 	endrule
 
 	rule printResults if (state == TEST_PRINT);
-		let rburst = marsh.rowAccesses[valueOf(DATA_IO_BLK)].readResp;
-		$display("rburst [%d]: %x", brCount, rburst);
-		if (brCount == (20*fromInteger(valueOf(BURSTS_PER_ROW)))-1) begin
+		let rburst <- marsh.rowAccesses[valueOf(DATA_IO_BLK)].readResp;
+		if (printColCnt == 6) begin
+			printColCnt <= 0;
+			printRowCnt <= printRowCnt+1;
+		end
+		else begin
+			printColCnt <= printColCnt + 1;
+		end
+		$display("rburst row[%d]: %x", printRowCnt, rburst);
+		//if (brCount == (20*fromInteger(valueOf(BURSTS_PER_ROW)))-1) begin
 		//if (brCount == currReq.numRows*32-1) begin
-			brCount <= 0;
+		if (reduceAnd(rburst) == 1) begin
+			//brCount <= 0;
 			state <= TEST_IDLE;
 			$display("TB: done reading bursts");
 			$finish;
 		end
-		else begin
-			brCount <= brCount+1;
-		end	
 	endrule
 
 endmodule
