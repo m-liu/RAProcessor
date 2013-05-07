@@ -23,7 +23,8 @@ module mkProjection (OPERATOR_IFC);
    FIFO#(RowBurst) rdataQ <- mkFIFO;
    Reg#(ProjState) state <- mkReg(PROJ_IDLE);
    //Reg#(Row) ouputBuff <- mkReg(0);
-   Reg#(TAdd(TLog#(COL_WIDTH), 1)) rdBurstCnt <- mkReg(0);
+   //Reg#(TAdd#(TLog#(COL_WIDTH), 1)) rdBurstCnt <- mkReg(0);
+   Reg#(Bit#(TAdd#(TLog#(COL_WIDTH), 1))) rdBurstCnt <- mkReg(0);
    Reg#(RowAddr) wrBurstCnt <- mkReg(0);
    Reg#(RowAddr) rowCnt <- mkReg(0);
 

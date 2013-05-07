@@ -17,7 +17,7 @@ typedef enum { TEST_IDLE, TEST_REQ, TEST_WR, TEST_RD, TEST_DONE, TEST_SELECT, TE
 
 
 //typedef 3 SEL_OP;
-typedef 4 NUM_TESTS;
+typedef 3 NUM_TESTS;
 
 module mkSelectionTest();
 	DDR2_User ddrServer <- mkDDR2Simulator();
@@ -58,7 +58,7 @@ module mkSelectionTest();
 							reqType: REQ_EOT,
 							op: WRITE };
 
-	testReq[3] = RowReq{ 	tableAddr: 23,
+	testReq[2] = RowReq{ 	tableAddr: 23,
 							rowOffset: 0,
 						  	numRows: ?,
 							numCols: 7,
