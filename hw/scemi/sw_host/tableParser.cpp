@@ -240,12 +240,13 @@ void dumpMemory(InportProxyT<RowReq> &rowReq, OutportQueueT<RowBurst> &rdBurst){
       cout << resp << "\t";
       colCnt++;
     }
-
-    printf("\none table done\n\n");
+    
+    printf("\n\n");
+    //printf("\none table done\n\n");
     
   }
 
-  
+  /*
   reqType.m_val = RowReqType::e_REQ_NROWS;
   printf("reading a random row\n");
   cout << "Table Name:\t" << globalTableMeta[globalNextMeta-2].tableName;
@@ -285,7 +286,7 @@ void dumpMemory(InportProxyT<RowReq> &rowReq, OutportQueueT<RowBurst> &rdBurst){
     colCnt++;
   }  
   printf("\n");
-
+  */
 }
 
 bool parsecsv(InportProxyT<RowReq> &rowReq, InportProxyT<RowBurst> &wrBurst){
