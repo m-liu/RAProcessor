@@ -14,7 +14,7 @@ typedef enum { TEST_IDLE, TEST_REQ, TEST_WR, TEST_RD, TEST_DONE } TestState deri
 
 
 //typedef 3 SEL_OP;
-typedef 5 NUM_TESTS;
+typedef 4 NUM_TESTS;
 
 module mkRowMarshallerTest();
 	DDR2_User ddrServer <- mkDDR2Simulator();
@@ -37,12 +37,12 @@ module mkRowMarshallerTest();
 	Vector#(NUM_TESTS, RowReq) testReq = newVector();
 	testReq[0] = RowReq{ 	tableAddr: 23,
 							rowOffset: 0,
-						  	numRows: 5,
+						  	numRows: ?,
 							numCols: 7, 
 							reqSrc: fromInteger(valueOf(SELECTION_BLK)),
-							reqType: REQ_NROWS,
+							reqType: REQ_ALLROWS,
 							op: WRITE };
-	
+	/*
 	testReq[1] = RowReq{ 	tableAddr: 23,
 							rowOffset: 5,
 						  	numRows: 8,
@@ -50,8 +50,8 @@ module mkRowMarshallerTest();
 							reqSrc: fromInteger(valueOf(SELECTION_BLK)),
 							reqType: REQ_EOT,
 							op: WRITE };
-
-	testReq[2] = RowReq{ 	tableAddr: 23,
+*/
+	testReq[1] = RowReq{ 	tableAddr: 23,
 							rowOffset: 3,
 						  	numRows: 1,
 							numCols: 7, 
@@ -60,7 +60,7 @@ module mkRowMarshallerTest();
 							op: WRITE };
 
 
-	testReq[3] = RowReq{ 	tableAddr: 23,
+	testReq[2] = RowReq{ 	tableAddr: 23,
 							rowOffset: 0,
 						  	numRows: ?,
 							numCols: 7,
@@ -68,7 +68,7 @@ module mkRowMarshallerTest();
 							reqType: REQ_ALLROWS,
 							op: READ };
 
-	testReq[4] = RowReq{ 	tableAddr: 23,
+	testReq[3] = RowReq{ 	tableAddr: 23,
 							rowOffset: 3,
 						  	numRows: 2,
 							numCols: 7,
@@ -102,20 +102,31 @@ module mkRowMarshallerTest();
 	endrule
 
 	rule burstingWR if (state==TEST_WR);
-		$display("wburst [%d]: %x", brCount, someData);
-		marsh.rowAccesses[currReq.reqSrc].writeData (someData);
-		if (someData < 'hFFFFFFFF) begin
-			someData <= someData+1;
+		Bit#(31) numBursts;
+		if (currReq.reqType == REQ_ALLROWS) begin
+			numBursts = (11*currReq.numCols * fromInteger(valueOf(COLS_PER_BURST)));
+		end
+		else begin
+			numBursts = (currReq.numRows*currReq.numCols * fromInteger(valueOf(COLS_PER_BURST)));
 		end
 
-		if (brCount == (currReq.numRows*currReq.numCols * fromInteger(valueOf(COLS_PER_BURST)))-1) begin
+		if (brCount < numBursts) begin
+			$display("wburst [%d]: %x", brCount, someData);
+			marsh.rowAccesses[currReq.reqSrc].writeData (someData);
+			brCount <= brCount+1;
+			someData <= someData+1;
+		end
+		else begin
+			//signal end of table
+			if (currReq.reqType == REQ_ALLROWS) begin
+				RowBurst eot = -1;
+				$display("wburst EOT [%d]: %x", brCount, eot);
+				marsh.rowAccesses[currReq.reqSrc].writeData (eot);
+			end
 			brCount <= 0;
 			state <= TEST_IDLE;
 			reqInd <= reqInd+1;
 			$display("TB: done sending bursts");
-		end
-		else begin
-			brCount <= brCount+1;
 		end
 	endrule
 

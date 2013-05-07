@@ -70,7 +70,7 @@ interface ROW_MARSHALLER_IFC;
 	interface DDR2Client ddrMem;
 endinterface
 
-typedef enum {READY, READ_DDR, WRITE_DDR, READ_DDR_ALLROWS} State deriving (Eq, Bits);
+typedef enum {READY, READ_DDR, WRITE_DDR, READ_DDR_ALLROWS, WRITE_DDR_ALLROWS, WRITE_DDR_ALLROWSEOT} State deriving (Eq, Bits);
 
 
 
@@ -113,7 +113,8 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 	Reg#(DDR2Data) wdataBuff <- mkReg(0);
 	Reg#(Bit#(32)) wdataEn <- mkReg(0);
 
-	Reg#(Bool) endOfTable <- mkReg(False);
+	Reg#(Bool) rEndOfTable <- mkReg(False);
+	Reg#(Bool) wEndOfTable <- mkReg(False);
 
 	//********************
 	//Rules
@@ -165,7 +166,7 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 			rDdrCounter <= rDdrStartAddr;
 			rDdrCounterOut <= rDdrStartAddr;
 			rState <= READ_DDR_ALLROWS;
-			endOfTable <= False;
+			rEndOfTable <= False;
 			$display("Marsh: acceptReq READ ALL ROWS ddrStart=%x", rDdrStartAddr);
 		end
 		else begin //REQ_NROWS
@@ -182,7 +183,7 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 	//*************************************
 
 	rule reqReadDDRAllRows if (rState == READ_DDR_ALLROWS &&
-								endOfTable == False &&
+								rEndOfTable == False &&
 								dataOutEmptyCnt >= fromInteger(valueOf(BURSTS_PER_DDR_DATA)));
 		$display("Marsh: read [ALLROWS] req DDR at addr=%x", rDdrCounter);
 		ddrReq.enq(DDR2Request{ writeen: 0,
@@ -206,7 +207,7 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 	//IMPORTANT: always drain the read data before making more requests
 	(* descending_urgency = "readDDRAllRows, reqReadDDRAllRows" *)
 	rule readDDRAllRows if (rState == READ_DDR_ALLROWS);
-		if (endOfTable == False) begin
+		if (rEndOfTable == False) begin
 		//if (rDdrCounterOut < rDdrCounter) begin //TODO this may be a problem if we can't issue req fast enough
 			DDR2Data resp = ddrResp.first();
 			$display("DDR response AR: %x", resp);
@@ -218,7 +219,7 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 				
 				//all 1's, end of table reached
 				if ( reduceAnd(truncRespShift) == 1 ) begin
-					endOfTable <= True;
+					rEndOfTable <= True;
 					dataOut[currReadReq.reqSrc].enq(truncRespShift);
 					$display("Marsh AR: reading (last) data %x, burstCount=%d", truncRespShift, rburstCounter);
 					//+1 for the last burst of 1's
@@ -249,7 +250,7 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 		end
 
 		//drain the rest of the responses
-		else if (endOfTable == True && rDdrCounterOut < rDdrCounter) begin
+		else if (rEndOfTable == True && rDdrCounterOut < rDdrCounter) begin
 			$display("Marsh AR: drained DDR burst");
 			dataOutEnqCnt <= dataOutEnqCnt - fromInteger(valueOf(BURSTS_PER_DDR_DATA));
 			ddrResp.deq();
@@ -340,20 +341,27 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 		
 		//set the starting burst counter for the first row
 		wburstCounter <= zeroExtend(wDdrStartOffset);
-
-		wState <= WRITE_DDR;
-		$display("Marsh: acceptReq WRITE ddrStart=%x, ddrStop=%x, offsetStart=%d, offsetStop=%d", wDdrStartAddr, wDdrStopAddr, wDdrStartOffset, wDdrStopOffset);
+	
+		if (currWriteReq.reqType == REQ_ALLROWS) begin
+			wState <= WRITE_DDR_ALLROWS;
+			wEndOfTable <= False;
+			$display("Marsh: acceptReq WRITE ALLROWS ddrStart=%x, ddrStop=%x, offsetStart=%d, offsetStop=%d", wDdrStartAddr, wDdrStopAddr, wDdrStartOffset, wDdrStopOffset);
+		end
+		else begin
+			wState <= WRITE_DDR;
+			$display("Marsh: acceptReq WRITE NROWS ddrStart=%x, ddrStop=%x, offsetStart=%d, offsetStop=%d", wDdrStartAddr, wDdrStopAddr, wDdrStartOffset, wDdrStopOffset);
+		end
 	endrule
 
 
 
 	//IMPORTANT: prioritize writes over reads. This ensures no deadlock occurs. 
 	//Results will always drain
-	(* descending_urgency = "reqWriteDDR, reqReadDDR, reqReadDDRAllRows" *)
+	(* descending_urgency = "reqWriteDDR, reqWriteDDRAllRows, reqWriteDDRAllRowsEot, reqReadDDR, reqReadDDRAllRows" *)
+
 	//(* descending_urgency = "reqReadDDR, reqWriteDDR" *)
 	rule reqWriteDDR if (wState == WRITE_DDR);
 		if (wDdrCounter < wDdrStopAddr) begin
-
 			//if it's the last row, send the ddr req when the last burst arrives;
 			//don't wait for alignment
 //			if (  (wburstCounter < fromInteger(valueOf(BURSTS_PER_DDR_DATA)) && wDdrCounter+4 < wDdrStopAddr) ||
@@ -410,6 +418,74 @@ module mkRowMarshaller(ROW_MARSHALLER_IFC);
 			wState <= READY;
 		end
 	endrule
+
+
+	//*************************************
+	//Rules to write all rows of a table
+	//*************************************
+
+	rule reqWriteDDRAllRows if (wState == WRITE_DDR_ALLROWS);
+
+		if (  wburstCounter < fromInteger(valueOf(BURSTS_PER_DDR_DATA)) ) begin
+			Bit#(BURST_WIDTH_BYTES) en = -1;
+			//if (wDdrCounter+4 < wDdrStopAddr || wburstCounter <= zeroExtend(wDdrStopOffset)) begin
+			if (wEndOfTable == False) begin
+				dataIn[currWriteReq.reqSrc].deq();
+				let data = dataIn[currWriteReq.reqSrc].first();
+				if (reduceAnd(data) == 1) begin
+					wEndOfTable <= True;
+					Bit#(BURST_WIDTH) eotData = -1;
+					wdataBuff <= (wdataBuff<< valueOf(BURST_WIDTH)) | zeroExtend(eotData);
+					wdataEn <= wdataEn << valueOf(BURST_WIDTH_BYTES) | zeroExtend(en);
+				end
+				else begin
+					//assemble write data
+					wdataBuff <= (wdataBuff<< valueOf(BURST_WIDTH)) | zeroExtend(data);
+					//assemble the write enable
+					wdataEn <= wdataEn << valueOf(BURST_WIDTH_BYTES) | zeroExtend(en);
+				end
+			end
+			//if end of table marker burst seen, write 1's
+			else  begin
+				Bit#(BURST_WIDTH) eotData = -1;
+				wdataBuff <= (wdataBuff<< valueOf(BURST_WIDTH)) | zeroExtend(eotData);
+				wdataEn <= wdataEn << valueOf(BURST_WIDTH_BYTES) | zeroExtend(en);
+			end
+
+			wburstCounter <= wburstCounter+1;
+		end
+		else begin
+			$display("Marsh: writing ddr addr: %x, data: %x, en: %x", wDdrCounter, wdataBuff, wdataEn);
+			ddrReq.enq(DDR2Request{ writeen: wdataEn,
+									//writeen: 'hFFFFFFFF,
+									address: wDdrCounter,
+									datain: wdataBuff
+								});
+			wDdrCounter <= wDdrCounter + 4; //4 bursts of 64 bits
+			wburstCounter <= 0;
+			wdataEn <= 0;
+			wdataBuff <= 0;
+			if (wEndOfTable == True) begin
+				wState <= WRITE_DDR_ALLROWSEOT;
+			end
+		end
+	endrule
+
+
+	//write one more burst of 1's
+	rule reqWriteDDRAllRowsEot if (wState == WRITE_DDR_ALLROWSEOT);
+		$display("Marsh: writing ddr EOT at addr: %x, data: -1", wDdrCounter);
+		ddrReq.enq(DDR2Request{ 
+								writeen: 'hFFFFFFFF,
+								address: wDdrCounter,
+								datain: -1
+							});
+		rowWriteReqQ.deq();
+		wState <= READY;
+	endrule
+
+
+
 
 
 	
