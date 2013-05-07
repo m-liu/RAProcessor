@@ -254,7 +254,7 @@ CmdEntry_sw parseProject (char cmdTokens[][MAX_CHARS], int numTokens){
 
 	cmdEntry.outputAddr = globalTableMeta[globalNextMeta].startAddr;
 	cmdEntry.colProjectMask = mask;
-	cmdEntry.projColNum = newInd;
+	cmdEntry.projNumCols = newInd;
 	cmdEntry.op = PROJECT;
     cmdEntry.table0Addr = tableMeta.startAddr;
     cmdEntry.table0numRows = tableMeta.numRows;

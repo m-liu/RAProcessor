@@ -35,7 +35,7 @@ typedef struct {
 
 	//Project
 	Bit#(COL_WIDTH) colProjectMask;
-	RowAddr projColNum; //TODO NEW
+	RowAddr projNumCols; //TODO NEW
 
 	//Union/Diff/Xprod
 	RowAddr table1Addr;
@@ -85,7 +85,7 @@ function Fmt showCmd(CmdEntry cmdEntry);
       PROJECT:
       begin
 	 ret = ret + fshow("---PROJECT---\n");
-	 ret = ret + $format("projColNum = %d\n", cmdEntry.projColNum) + $format("projectMask = %h\n", cmdEntry.colProjectMask);
+	 ret = ret + $format("projNumCols = %d\n", cmdEntry.projNumCols) + $format("projectMask = %h\n", cmdEntry.colProjectMask);
       end
       UNION, DIFFERENCE, XPROD:
       begin

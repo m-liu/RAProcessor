@@ -59,7 +59,7 @@ module mkProjection (OPERATOR_IFC);
 					rowOffset: 0,
 //					numRows: currCmd.table0numRows,
 					numRows: ?,
-					numCols: currCmd.projColNum,
+					numCols: currCmd.projNumCols,
 					reqSrc: fromInteger(valueOf(PROJECTION_BLK)),
 					reqType: REQ_ALLROWS,
 					op: WRITE });

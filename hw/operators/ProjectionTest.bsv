@@ -147,7 +147,7 @@ module mkProjectionTest();
 			       table0numCols: 7, //just use max for now
 			       outputAddr: 50,
 			       colProjectMask: 'h13,
-				   projColNum: 3
+				   projNumCols: 3
 			       //clauses: testClauses,
 			       //validClauseMask: 'h11 //OR
 						};
