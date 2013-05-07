@@ -254,6 +254,7 @@ CmdEntry_sw parseProject (char cmdTokens[][MAX_CHARS], int numTokens){
 
 	cmdEntry.outputAddr = globalTableMeta[globalNextMeta].startAddr;
 	cmdEntry.colProjectMask = mask;
+	cmdEntry.projColNum = newInd;
 	cmdEntry.op = PROJECT;
     cmdEntry.table0Addr = tableMeta.startAddr;
     cmdEntry.table0numRows = tableMeta.numRows;
@@ -551,6 +552,7 @@ void loadCommands(InportProxyT<BuffInit> & cmdBuffRequest, CmdEntry_sw *cmdEntry
     cmdEntry.m_outputAddr = cmdEntry_sw.outputAddr;
     //cmdEntry.m_numClauses = cmdEntry_sw.numClauses;
     cmdEntry.m_colProjectMask = cmdEntry_sw.colProjectMask;
+    cmdEntry.m_projNumCols = cmdEntry_sw.projNumCols;
     cmdEntry.m_table1Addr = cmdEntry_sw.table1Addr;
     cmdEntry.m_table1numRows = cmdEntry_sw.table1numRows;
     cmdEntry.m_table1numCols = cmdEntry_sw.table1numCols;

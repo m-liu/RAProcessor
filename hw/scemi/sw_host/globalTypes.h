@@ -56,6 +56,7 @@ struct CmdEntry_sw {
 
     //Project
     uint32_t colProjectMask;
+    uint32_t projColNum;
 
     //Union/Diff/Xprod
     uint32_t table1Addr;
