@@ -85,7 +85,7 @@ function Fmt showCmd(CmdEntry cmdEntry);
       PROJECT:
       begin
 	 ret = ret + fshow("---PROJECT---\n");
-	 ret = ret + $format("projectMask = %h\n", cmdEntry.colProjectMask);
+	 ret = ret + $format("projColNum = %d\n", cmdEntry.projColNum) + $format("projectMask = %h\n", cmdEntry.colProjectMask);
       end
       UNION, DIFFERENCE, XPROD:
       begin

@@ -27,7 +27,7 @@ module mkXprod (OPERATOR_IFC);
    Vector#(BURSTS_PER_ROW, Reg#(RowBurst)) rowBuff <- replicateM(mkRegU());
    //Reg#(Row) rowBuff <- mkReg(0);
    Reg#(RowAddr) inputAddrCnt <- mkReg(0);
-   Reg#(RowAddr) outputAddrCnt <- mkReg(0);
+   //Reg#(RowAddr) outputAddrCnt <- mkReg(0);
    Reg#(RowAddr) outer_rdBurstCnt <- mkReg(0);
    Reg#(RowAddr) inner_rdBurstCnt <- mkReg(0);
    //Reg#(RowAddr) wrBurstCnt <- mkReg(0);
@@ -44,7 +44,7 @@ module mkXprod (OPERATOR_IFC);
    rule xprod_idle if (state == XPROD_IDLE);
       $display("IDLE");
       inputAddrCnt <= 0;
-      outputAddrCnt <= 0;
+      //outputAddrCnt <= 0;
       outer_rdBurstCnt <= 0;
       inner_rdBurstCnt <= 0;
       //wrBurstCnt <= 0;
@@ -52,6 +52,13 @@ module mkXprod (OPERATOR_IFC);
       //outer_rowCnt <= 0;
       //inner_rowCnt <= 0;
       total_rowCnt <= 0;
+      rowReqQ.enq( RowReq{tableAddr: currCmd.outputAddr,
+			  rowOffset: 0,
+			  numRows: ?,
+			  numCols: ?,
+			  reqSrc: fromInteger(valueOf(XPROD_BLK)),
+			  reqType: REQ_ALLROWS,
+			  op: WRITE });
       state <= XPROD_OUTER_RD_REQ;
    endrule
    
@@ -91,13 +98,15 @@ module mkXprod (OPERATOR_IFC);
 	 outer_rdBurstCnt <= 0;
 	 
 	 if ( reduceAnd(rowBuff[0]) == 1) begin
-	    rowReqQ.enq( RowReq{tableAddr: currCmd.outputAddr,
+	    /*rowReqQ.enq( RowReq{tableAddr: currCmd.outputAddr,
 				rowOffset: total_rowCnt,
 				numRows: 8,
 				numCols: currCmd.table0numCols + currCmd.table1numCols,
 				reqSrc: fromInteger(valueOf(XPROD_BLK)),
 				reqType: REQ_EOT,
 				op: WRITE });
+	    */
+	    wdataQ.enq(-1);
 	    $display("outer loop finishes");
 	    cmdQ.deq();
 	    ackRows.enq(total_rowCnt);
@@ -113,26 +122,28 @@ module mkXprod (OPERATOR_IFC);
 				reqSrc: fromInteger(valueOf(XPROD_BLK)),
 				reqType: REQ_ALLROWS,
 				op: READ });
-	    state <= XPROD_INNER_WR_REQ;
+	    inner_rdBurstCnt <= 0;
+	    state <= XPROD_PROCESS_ROW;
 	 end
 	
       end
    endrule
    
-   
+   /*
    rule inner_loop_wr_req if (state == XPROD_INNER_WR_REQ);
       $display("INNER_WR_REQ");
       rowReqQ.enq( RowReq{tableAddr: currCmd.outputAddr,
 			  rowOffset: outputAddrCnt,
-			  numRows: currCmd.table1numRows,
-			  numCols: currCmd.table0numCols + currCmd.table1numCols,
+			  numRows: ?,
+			  numCols: ?,
 			  reqSrc: fromInteger(valueOf(XPROD_BLK)),
-			  reqType: REQ_NROWS,
+			  reqType: REQ_ALLROWS,
 			  op: WRITE });
       state <= XPROD_PROCESS_ROW;
       //wrBurstCnt <= currCmd.table0numCols;
       inner_rdBurstCnt <= 0;
    endrule
+    */
    
    rule process_row if (state == XPROD_PROCESS_ROW);
       $display("PROCESS_ROW");
@@ -159,7 +170,7 @@ module mkXprod (OPERATOR_IFC);
 	    total_rowCnt <= total_rowCnt + 1;
 	    if ( reduceAnd(rBurst) == 1 ) begin
 	       rdataQ.deq();
-	       outputAddrCnt <= outputAddrCnt + currCmd.table1numRows;
+	       //outputAddrCnt <= outputAddrCnt + currCmd.table1numRows;
 	       state <= XPROD_OUTER_RD_REQ;
 	    end
 	 end

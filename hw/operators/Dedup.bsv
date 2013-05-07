@@ -53,10 +53,20 @@ module mkDedup (OPERATOR_IFC);
       //inner_rowCnt <= 0;
       //total_rowCnt <= 0;
       state <= DEDUP_CP_TABLE0_RD_REQ;
+      rowReqQ.enq(RowReq{tableAddr: currCmd.outputAddr,
+			 rowOffset: 0,
+			 numRows: ?,
+			 numCols: ?,
+			 reqSrc: fromInteger(valueOf(DEDUP_BLK)),
+			 reqType: REQ_ALLROWS,
+			 op: WRITE });
    endrule
    
    rule outer_loop_rd_req if (state == DEDUP_CP_TABLE0_RD_REQ);
-      //$display("DEDUP_CP_TABLE1_RD_REQ");
+      $display("DEDUP_CP_TABLE1_RD_REQ");
+      
+      $display("table0Addr: %d", currCmd.table0Addr);
+      $display("inputAddrCnt: %d", inputAddrCnt);
       rowReqQ.enq( RowReq{tableAddr: currCmd.table0Addr,
 			  rowOffset: inputAddrCnt,
 			  numRows: 1,
@@ -70,7 +80,7 @@ module mkDedup (OPERATOR_IFC);
    endrule
    
    rule outer_loop_rd_resp if (state == DEDUP_OUTER_BUFF_ROW);
-      //$display("DEDUP_OUTER_BUFF_ROW");
+      $display("DEDUP_OUTER_BUFF_ROW");
       if (outer_rdBurstCnt < currCmd.table0numCols) begin
 	 let rburst = rdataQ.first();
 	 $display("rburst = %h",rburst);
@@ -84,6 +94,8 @@ module mkDedup (OPERATOR_IFC);
 	    cmdQ.deq();
 	    ackRows.enq(outputAddrCnt);
 	    state <= DEDUP_IDLE;
+	    wdataQ.enq(-1);
+	    /*
 	    rowReqQ.enq(RowReq{tableAddr: currCmd.outputAddr,
 			 rowOffset: outputAddrCnt,
 			 numRows: 8,
@@ -91,6 +103,7 @@ module mkDedup (OPERATOR_IFC);
 			 reqSrc: fromInteger(valueOf(DEDUP_BLK)),
 			 reqType: REQ_EOT,
 			 op: WRITE });
+	     */
 	 end
 	 else begin
 	    outer_rdBurstCnt <= 0;
@@ -98,10 +111,14 @@ module mkDedup (OPERATOR_IFC);
 	    //inner_rowCnt <= 0;
 	    match_found <= True;
 	    scan_rows <= True;
+	    
+	    $display("table0Addr: %d", currCmd.table0Addr);
+	    $display("inputAddrCnt: %d", inputAddrCnt);
+	    //$finish;
 	    rowReqQ.enq( RowReq{tableAddr: currCmd.table0Addr,
 				rowOffset: inputAddrCnt,
 				numRows: ?,
-				numCols: ?,
+				numCols: currCmd.table0numCols,
 				reqSrc: fromInteger(valueOf(DEDUP_BLK)),
 				reqType: REQ_ALLROWS,
 				op: READ });
@@ -112,19 +129,20 @@ module mkDedup (OPERATOR_IFC);
    endrule
     
    rule process_row if (state == DEDUP_PROCESS_ROW);
-      //$display("DEDUP_PROCESS_ROW");
+      $display("DEDUP_PROCESS_ROW");
       if ( inner_rdBurstCnt < currCmd.table0numCols ) begin
 	 let rBurst = rdataQ.first();
 	 rdataQ.deq();
-	 //$display("rBurst = %h", rBurst);
+	 $display("rBurst = %h", rBurst);
 	 if ( reduceAnd(rBurst) == 1 ) begin
 	       //rdataQ.deq();
 	       if ( scan_rows ) begin
-		  //$display("no match found");
-		  state <= DEDUP_CP_TABLE0_WR_REQ;
+		  $display("no match found");
+		  state <= DEDUP_CP_TABLE0_WR_ROW;
+		  outputAddrCnt <= outputAddrCnt + 1;
 	       end
 	       else begin
-		  //$display("match found");
+		  $display("match found");
 		  state <= DEDUP_CP_TABLE0_RD_REQ;
 	       end
 	    end
@@ -148,7 +166,7 @@ module mkDedup (OPERATOR_IFC);
 	 
       end	  
    endrule
-   
+   /*
    rule cp_table1_wr_req if ( state == DEDUP_CP_TABLE0_WR_REQ);
       rowReqQ.enq(RowReq{tableAddr: currCmd.outputAddr,
 			 rowOffset: outputAddrCnt,
@@ -158,10 +176,10 @@ module mkDedup (OPERATOR_IFC);
 			 reqType: REQ_NROWS,
 			 op: WRITE });
       
-      outputAddrCnt <= outputAddrCnt + 1;
+      
       state <= DEDUP_CP_TABLE0_WR_ROW;
    endrule
-   
+   */
    rule cp_table1_wr_row if ( state == DEDUP_CP_TABLE0_WR_ROW );
       if ( wrBurstCnt < currCmd.table0numCols ) begin
 	  wdataQ.enq(rowBuff[wrBurstCnt]);

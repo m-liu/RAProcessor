@@ -52,6 +52,14 @@ module mkDifference (OPERATOR_IFC);
       //outer_rowCnt <= 0;
       //inner_rowCnt <= 0;
       //total_rowCnt <= 0;
+      rowReqQ.enq(RowReq{tableAddr: currCmd.outputAddr,
+			 rowOffset: 0,
+			 numRows: ?,
+			 numCols: ?,
+			 reqSrc: fromInteger(valueOf(DIFFERENCE_BLK)),
+			 reqType: REQ_ALLROWS,
+			 op: WRITE });
+      
       state <= DIFFERENCE_CP_TABLE0_RD_REQ;
    endrule
    
@@ -68,7 +76,6 @@ module mkDifference (OPERATOR_IFC);
 			  op: READ });
       inputAddrCnt <= inputAddrCnt + 1;
       state <= DIFFERENCE_OUTER_BUFF_ROW;
-      
    endrule
    
    rule outer_loop_rd_resp if (state == DIFFERENCE_OUTER_BUFF_ROW);
@@ -87,6 +94,7 @@ module mkDifference (OPERATOR_IFC);
 	    cmdQ.deq();
 	    ackRows.enq(outputAddrCnt);
 	    state <= DIFFERENCE_IDLE;
+	    /*
 	    rowReqQ.enq(RowReq{tableAddr: currCmd.outputAddr,
 			 rowOffset: outputAddrCnt,
 			 numRows: 8,
@@ -94,6 +102,8 @@ module mkDifference (OPERATOR_IFC);
 			 reqSrc: fromInteger(valueOf(DIFFERENCE_BLK)),
 			 reqType: REQ_EOT,
 			 op: WRITE });
+	    */
+	    wdataQ.enq(-1);
 	 end
 	 else begin
 	    outer_rdBurstCnt <= 0;
@@ -138,32 +148,23 @@ module mkDifference (OPERATOR_IFC);
 	       rdataQ.deq();
 	       if ( scan_rows ) begin
 		  $display("no match found");
-		  state <= DIFFERENCE_CP_TABLE0_WR_REQ;
+		  state <= DIFFERENCE_CP_TABLE0_WR_ROW;
+		  outputAddrCnt <= outputAddrCnt + 1;
 	       end
 	       else begin
-		  $display("match found");
-		  state <= DIFFERENCE_CP_TABLE0_RD_REQ;
-	       end
+                  $display("match found");
+                  state <= DIFFERENCE_CP_TABLE0_RD_REQ;
+               end
 	    end
-	    else begin   
+	    else begin
 	       match_found <= True;
-	       inner_rdBurstCnt <= 0;     
-	    end
+	       inner_rdBurstCnt <= 0;
+	    end   
 	 end
-      end	  
+      end
    endrule
    
-   rule cp_table1_wr_req if ( state == DIFFERENCE_CP_TABLE0_WR_REQ);
-      rowReqQ.enq(RowReq{tableAddr: currCmd.outputAddr,
-			 rowOffset: outputAddrCnt,
-			 numRows: 1,
-			 numCols: currCmd.table0numCols,
-			 reqSrc: fromInteger(valueOf(DIFFERENCE_BLK)),
-			 reqType: REQ_NROWS,
-			 op: WRITE });
-      outputAddrCnt <= outputAddrCnt + 1;
-      state <= DIFFERENCE_CP_TABLE0_WR_ROW;
-   endrule
+   
    
    rule cp_table1_wr_row if ( state == DIFFERENCE_CP_TABLE0_WR_ROW );
       if ( wrBurstCnt < currCmd.table0numCols) begin

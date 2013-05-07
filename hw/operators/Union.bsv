@@ -69,10 +69,10 @@ module mkUnion (OPERATOR_IFC);
       //$display("UNION_CP_TABLE0_WR_REQ");
       rowReqQ.enq(RowReq{tableAddr: currCmd.outputAddr,
 			 rowOffset: 0,
-			 numRows: currCmd.table0numRows,
-			 numCols: currCmd.table0numCols,
+			 numRows: ?,
+			 numCols: ?,
 			 reqSrc: fromInteger(valueOf(UNION_BLK)),
-			 reqType: REQ_NROWS,
+			 reqType: REQ_ALLROWS,
 			 op: WRITE });
       state <= UNION_CP_TABLE0;
    endrule
@@ -152,6 +152,8 @@ module mkUnion (OPERATOR_IFC);
 	    cmdQ.deq();
 	    ackRows.enq(outputAddrCnt);
 	    state <= UNION_IDLE;
+	    wdataQ.enq(-1);
+	    /*
 	    rowReqQ.enq(RowReq{tableAddr: currCmd.outputAddr,
 			 rowOffset: outputAddrCnt,
 			 numRows: 8,
@@ -159,6 +161,7 @@ module mkUnion (OPERATOR_IFC);
 			 reqSrc: fromInteger(valueOf(UNION_BLK)),
 			 reqType: REQ_EOT,
 			 op: WRITE });
+	     */
 	 end
 	 else begin
 	    outer_rdBurstCnt <= 0;
@@ -208,7 +211,8 @@ module mkUnion (OPERATOR_IFC);
 	       rdataQ.deq();
 	       if ( scan_rows ) begin
 		  $display("no match found");
-		  state <= UNION_CP_TABLE1_WR_REQ;
+		  state <= UNION_CP_TABLE1_WR_ROW;
+		  outputAddrCnt <= outputAddrCnt + 1;
 	       end
 	       else begin
 		  $display("match found");
@@ -224,7 +228,7 @@ module mkUnion (OPERATOR_IFC);
       end
       
    endrule
-   
+   /*
    rule cp_table1_wr_req if ( state == UNION_CP_TABLE1_WR_REQ);
       rowReqQ.enq(RowReq{tableAddr: currCmd.outputAddr,
 			 rowOffset: outputAddrCnt,
@@ -236,7 +240,7 @@ module mkUnion (OPERATOR_IFC);
       outputAddrCnt <= outputAddrCnt + 1;
       state <= UNION_CP_TABLE1_WR_ROW;
    endrule
-   
+   */
    rule cp_table1_wr_row if ( state == UNION_CP_TABLE1_WR_ROW );
       if ( wrBurstCnt < currCmd.table0numCols ) begin
 	 wdataQ.enq(rowBuff[wrBurstCnt]);
