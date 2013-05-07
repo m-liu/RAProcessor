@@ -25,17 +25,19 @@ module mkXprod (OPERATOR_IFC);
    //Reg#(Row) ouputBuff <- mkReg(0);
    
    Vector#(BURSTS_PER_ROW, Reg#(RowBurst)) rowBuff <- replicateM(mkRegU());
+   //Reg#(Row) rowBuff <- mkReg(0);
    Reg#(RowAddr) inputAddrCnt <- mkReg(0);
    Reg#(RowAddr) outputAddrCnt <- mkReg(0);
    Reg#(RowAddr) outer_rdBurstCnt <- mkReg(0);
    Reg#(RowAddr) inner_rdBurstCnt <- mkReg(0);
-   Reg#(RowAddr) wrBurstCnt <- mkReg(0);
+   //Reg#(RowAddr) wrBurstCnt <- mkReg(0);
    Reg#(RowAddr) table0ColCnt <- mkReg(0);
-   Reg#(RowAddr) outer_rowCnt <- mkReg(0);
-   Reg#(RowAddr) inner_rowCnt <- mkReg(0);
+   //Reg#(RowAddr) outer_rowCnt <- mkReg(0);
+   //Reg#(RowAddr) inner_rowCnt <- mkReg(0);
    Reg#(RowAddr) total_rowCnt <- mkReg(0);
 
-   Reg#(Bit#(COL_WIDTH)) colProjMask <- mkRegU();
+  // Reg#(Bit#(COL_WIDTH)) colProjMask <- mkRegU();
+   //Reg#(RowBurst) temp <- mkRegU();
 	
    let currCmd = cmdQ.first();
 	
@@ -45,31 +47,37 @@ module mkXprod (OPERATOR_IFC);
       outputAddrCnt <= 0;
       outer_rdBurstCnt <= 0;
       inner_rdBurstCnt <= 0;
-      wrBurstCnt <= 0;
+      //wrBurstCnt <= 0;
       table0ColCnt <= 0;
-      outer_rowCnt <= 0;
-      inner_rowCnt <= 0;
+      //outer_rowCnt <= 0;
+      //inner_rowCnt <= 0;
       total_rowCnt <= 0;
       state <= XPROD_OUTER_RD_REQ;
    endrule
    
    rule outer_loop_rd_req if (state == XPROD_OUTER_RD_REQ);
       $display("OUTER_RD_REQ");
-      $display(showCmd(currCmd));
-      rowReqQ.enq( RowReq{rowAddr: currCmd.table0Addr + inputAddrCnt,
-			    numRows: 1,
-			    reqSrc: fromInteger(valueOf(XPROD_BLK)),
-			    op: READ });
+      //$display(showCmd(currCmd));
+      rowReqQ.enq( RowReq{tableAddr: currCmd.table0Addr,
+			  rowOffset: inputAddrCnt,
+			  numRows: 1,
+			  numCols: currCmd.table0numCols,
+			  reqSrc: fromInteger(valueOf(XPROD_BLK)),
+			  reqType: REQ_NROWS,
+			  op: READ });
       inputAddrCnt <= inputAddrCnt + 1;
+      //rowBuff <= 0;
       state <= XPROD_OUTER_BUFF_ROW;
    endrule
    
    rule outer_loop_rd_resp if (state == XPROD_OUTER_BUFF_ROW);
       $display("OUTER_RD_RESP");
-      if (outer_rdBurstCnt < fromInteger(valueOf(BURSTS_PER_ROW))) begin
+      // currCmd.table0numCols + 1 is for 64-bit implementation in the future
+      if (outer_rdBurstCnt < (currCmd.table0numCols)/fromInteger(valueOf(COLS_PER_BURST)) ) begin
 	 let rburst = rdataQ.first();
 	 rdataQ.deq(); 
 	 rowBuff[outer_rdBurstCnt] <= rburst;
+	 //rowBuff <= (rowBuff << valueOf(BURST_WIDTH)) | zeroExtended(rburst);
 	 
 	 $display("%h",rburst);
 	 
@@ -81,11 +89,32 @@ module mkXprod (OPERATOR_IFC);
       end
       else begin
 	 outer_rdBurstCnt <= 0;
-	 rowReqQ.enq( RowReq{rowAddr: currCmd.table1Addr,
-			       numRows: currCmd.table1numRows,
-			       reqSrc: fromInteger(valueOf(XPROD_BLK)),
-			       op: READ });
-	 state <= XPROD_INNER_WR_REQ;
+	 
+	 if ( reduceAnd(rowBuff[0]) == 1) begin
+	    rowReqQ.enq( RowReq{tableAddr: currCmd.outputAddr,
+				rowOffset: total_rowCnt,
+				numRows: 8,
+				numCols: currCmd.table0numCols + currCmd.table1numCols,
+				reqSrc: fromInteger(valueOf(XPROD_BLK)),
+				reqType: REQ_EOT,
+				op: WRITE });
+	    $display("outer loop finishes");
+	    cmdQ.deq();
+	    ackRows.enq(total_rowCnt);
+	    state <= XPROD_IDLE;
+	 end
+	 //RowAddr shiftVal = fromInteger(valueOf(BURSTS_PER_ROW)) - outer_rdBurstCnt;
+	 //Row shiftedRow = rowBuff << (shiftVal * fromInteger(valueOf(BURST_WIDTH)));
+	 else begin
+	    rowReqQ.enq( RowReq{tableAddr: currCmd.table1Addr,
+				rowOffset: 0,
+				numRows: ?,
+				numCols: ?,
+				reqSrc: fromInteger(valueOf(XPROD_BLK)),
+				reqType: REQ_ALLROWS,
+				op: READ });
+	    state <= XPROD_INNER_WR_REQ;
+	 end
 	
       end
    endrule
@@ -93,106 +122,79 @@ module mkXprod (OPERATOR_IFC);
    
    rule inner_loop_wr_req if (state == XPROD_INNER_WR_REQ);
       $display("INNER_WR_REQ");
-      rowReqQ.enq( RowReq{rowAddr: currCmd.outputAddr+outputAddrCnt,
-			    numRows: currCmd.table1numRows,
-			    reqSrc: fromInteger(valueOf(XPROD_BLK)),
-			    op: WRITE });
+      rowReqQ.enq( RowReq{tableAddr: currCmd.outputAddr,
+			  rowOffset: outputAddrCnt,
+			  numRows: currCmd.table1numRows,
+			  numCols: currCmd.table0numCols + currCmd.table1numCols,
+			  reqSrc: fromInteger(valueOf(XPROD_BLK)),
+			  reqType: REQ_NROWS,
+			  op: WRITE });
       state <= XPROD_PROCESS_ROW;
-      wrBurstCnt <= currCmd.table0numCols;
+      //wrBurstCnt <= currCmd.table0numCols;
       inner_rdBurstCnt <= 0;
    endrule
    
    rule process_row if (state == XPROD_PROCESS_ROW);
       $display("PROCESS_ROW");
-      $display(wrBurstCnt);
-      // stream in the cols in the table0row
-      if ( table0ColCnt < currCmd.table0numCols ) begin
-	 $display("stream in the cols in the table0row: %h", rowBuff[table0ColCnt]);
+      if ( table0ColCnt < (currCmd.table0numCols)/fromInteger(valueOf(COLS_PER_BURST)) ) begin
+	       
+	 
+	 $display("outer_rd[%d] = %h",table0ColCnt,rowBuff[table0ColCnt]);
 	 wdataQ.enq(rowBuff[table0ColCnt]);
 	 table0ColCnt <= table0ColCnt + 1;
       end
       else begin
-	 // stream in the cols in the table1row
-	 if ( inner_rdBurstCnt < fromInteger(valueOf(BURSTS_PER_ROW)) ) begin
+	 if ( inner_rdBurstCnt < currCmd.table1numCols ) begin
 	    let rBurst = rdataQ.first();
-		rdataQ.deq(); 
+	    rdataQ.deq(); 
+	    $display("rdBurst[%d] = %h",inner_rdBurstCnt,rBurst);
 	    inner_rdBurstCnt <= inner_rdBurstCnt + 1;
-	    if ( wrBurstCnt < currCmd.table0numCols + currCmd.table1numCols ) begin
-	       $display("stream in the cols in the table1row %h", rBurst);
-	       wdataQ.enq(rBurst);
-	       wrBurstCnt <= wrBurstCnt + 1;
-	    end
-	    else
-	       $display("draining 0s");
+	    wdataQ.enq(rBurst);
 	 end
 	 else begin
-	    // stream in the appending 0s
-	    if ( wrBurstCnt < fromInteger(valueOf(BURSTS_PER_ROW)) ) begin
-	       $display("appending 0s");
-	       wdataQ.enq(0);
-	       wrBurstCnt <= wrBurstCnt + 1;
-	    end
-	    else begin
-	       $display("one row finishes");
-	       table0ColCnt <= 0;
-	       inner_rdBurstCnt <= 0;
-	       wrBurstCnt <= currCmd.table0numCols;
-	       total_rowCnt <= total_rowCnt + 1;
-	       // if inner loop finishes
-	       if ( inner_rowCnt + 1 >= currCmd.table1numRows ) begin
-		  $display("inner loop finishes");
-		  inner_rowCnt <= 0;
-		  outer_rowCnt <= outer_rowCnt + 1;
-		  // if outer loop finishes
-		  if ( outer_rowCnt + 1 >= currCmd.table0numRows ) begin
-		     $display("outer loop finishes");
-		     cmdQ.deq();
-		     ackRows.enq(total_rowCnt + 1);
-		     state <= XPROD_IDLE;
-		  end
-		  else begin
-		     outputAddrCnt <= outputAddrCnt + currCmd.table1numRows;
-		     state <= XPROD_OUTER_RD_REQ;
-		  end
-	       end
-	       
-	       else begin
-		  inner_rowCnt <= inner_rowCnt + 1;
-	       end
-	       
+	    let rBurst = rdataQ.first();
+	    table0ColCnt <= 0;
+	    inner_rdBurstCnt <= 0;
+	    $display("total_row: %d",total_rowCnt);
+	    total_rowCnt <= total_rowCnt + 1;
+	    if ( reduceAnd(rBurst) == 1 ) begin
+	       rdataQ.deq();
+	       outputAddrCnt <= outputAddrCnt + currCmd.table1numRows;
+	       state <= XPROD_OUTER_RD_REQ;
 	    end
 	 end
       end
+      
    endrule
 
 
-	//Interface definitions. 
-	interface ROW_ACCESS_CLIENT_IFC rowIfc;
-		method ActionValue#(RowReq) rowReq();
-			rowReqQ.deq();
-			return rowReqQ.first();
-		endmethod
-		method Action readResp (RowBurst rData);
-			rdataQ.enq(rData);
-		endmethod
-		method ActionValue#(RowBurst) writeData();
-			wdataQ.deq();
-			return wdataQ.first();
-		endmethod
-	endinterface 
+   //Interface definitions. 
+   interface ROW_ACCESS_CLIENT_IFC rowIfc;
+      method ActionValue#(RowReq) rowReq();
+	 rowReqQ.deq();
+	 return rowReqQ.first();
+      endmethod
+      method Action readResp (RowBurst rData);
+	 rdataQ.enq(rData);
+      endmethod
+      method ActionValue#(RowBurst) writeData();
+	 wdataQ.deq();
+	 return wdataQ.first();
+      endmethod
+   endinterface 
 
-	interface CMD_SERVER_IFC cmdIfc; 
+   interface CMD_SERVER_IFC cmdIfc; 
 
-		//interface definition
-		method Action pushCommand (CmdEntry cmdEntry);
-			cmdQ.enq(cmdEntry);
-		endmethod
-
-		method ActionValue#( Bit#(31) ) getAckRows();
-			ackRows.deq();
-			return ackRows.first();
-		endmethod
-	endinterface
+      //interface definition
+      method Action pushCommand (CmdEntry cmdEntry);
+	 cmdQ.enq(cmdEntry);
+      endmethod
+   
+      method ActionValue#( Bit#(31) ) getAckRows();
+	 ackRows.deq();
+	 return ackRows.first();
+      endmethod
+   endinterface
 
 
 endmodule

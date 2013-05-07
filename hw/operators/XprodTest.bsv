@@ -17,7 +17,7 @@ typedef enum { TEST_IDLE, TEST_REQ, TEST_WR, TEST_RD, TEST_DONE, TEST_PROJECT, T
 
 
 //typedef 3 SEL_OP;
-typedef 4 NUM_TESTS;
+typedef 6 NUM_TESTS;
 
 module mkXprodTest();
    DDR2_User ddrServer <- mkDDR2Simulator();
@@ -34,44 +34,79 @@ module mkXprodTest();
    Reg#(TestState) state <- mkReg(TEST_IDLE);
    Reg#(Bit#(31)) brCount <- mkReg(0);
    Reg#(Bit#(32)) reqInd <- mkReg(0);
-
+   Reg#(Bit#(32)) printColCnt <- mkReg(0);
+   Reg#(Bit#(32)) printRowCnt <- mkReg(0);
    //data
    //Reg#(RowBurst) someData <- mkReg(32'hDEADBEEF);
    Reg#(RowBurst) someData <- mkReg('hDEADBEEF);
 
    //Requests
    Vector#(NUM_TESTS, RowReq) testReq = newVector();
-   testReq[0] = RowReq{rowAddr: 23,
+   testReq[0] = RowReq{tableAddr: 23,
+		       rowOffset: 0,
 		       numRows: 20,
+		       numCols: 7, 
 		       reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
+		       reqType: REQ_NROWS,
 		       op: WRITE };
-   testReq[1] = RowReq{rowAddr: 23,
-		       numRows: 20,
-		       reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
-		       op: READ };
 	
-   testReq[2] = RowReq{rowAddr: 10,
-		       numRows: 5,
+   testReq[1] = RowReq{tableAddr: 23,
+		       rowOffset: 20,
+		       numRows: 8,
+		       numCols: 7, 
 		       reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
+		       reqType: REQ_EOT,
 		       op: WRITE };
-   testReq[3] = RowReq{rowAddr: 10,
+   
+   testReq[2] = RowReq{tableAddr: 10,
+		       rowOffset: 0,
 		       numRows: 5,
+		       numCols: 5,
 		       reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
+		       reqType: REQ_NROWS,
+		       op: WRITE };
+   
+   testReq[3] = RowReq{tableAddr: 10,
+		       rowOffset: 5,
+		       numRows: 8,
+		       numCols: 5,
+		       reqType: REQ_EOT,
+		       op: WRITE };
+   
+   testReq[4] = RowReq{tableAddr: 23,
+		       rowOffset: 0,
+		       numRows: ?,
+		       numCols: 7,
+		       reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
+		       reqType: REQ_ALLROWS,
 		       op: READ };
+   
+   testReq[5] = RowReq{tableAddr: 10,
+		       rowOffset: 0,
+		       numRows: ?,
+		       numCols: 5,
+		       reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
+		       reqType: REQ_ALLROWS,
+		       op: READ };
+   
 
    //send some requests
    let currReq = testReq[reqInd];
    rule sendReqs if (state==TEST_IDLE);
       if (reqInd < fromInteger(valueOf(NUM_TESTS))) begin
-	 
-	 $display("TB: sending req ind=%d", reqInd);
-	 
+	 $display(">>>>> TB: sending req ind=%d", reqInd);
+
 	 marsh.rowAccesses[currReq.reqSrc].rowReq(currReq);
-	 if (currReq.op ==WRITE) begin
-	    state <= TEST_WR;
+	 if (currReq.op ==WRITE && currReq.reqType == REQ_EOT) begin	    
+	    reqInd <= reqInd+1;
+	    state <= TEST_IDLE;
 	 end
-	 else begin
+	 else if (currReq.op==READ) begin
+	    $display("going to read");
 	    state <= TEST_RD;
+	 end
+	 else if (currReq.op==WRITE ) begin
+	    state <= TEST_WR; 
 	 end
       end
       else begin
@@ -84,7 +119,7 @@ module mkXprodTest();
       $display("wburst [%d]: %x", brCount, someData);
       marsh.rowAccesses[currReq.reqSrc].writeData (someData);
       someData <= someData+1;
-      if (brCount == (currReq.numRows*fromInteger(valueOf(BURSTS_PER_ROW)))-1) begin
+      if (brCount == (currReq.numRows*currReq.numCols * fromInteger(valueOf(COLS_PER_BURST)))-1) begin
 	 brCount <= 0;
 	 state <= TEST_IDLE;
 	 reqInd <= reqInd+1;
@@ -96,17 +131,29 @@ module mkXprodTest();
    endrule
 
    rule burstingRD if (state==TEST_RD);
-      let rburst = marsh.rowAccesses[currReq.reqSrc].readResp;
+      let rburst <- marsh.rowAccesses[currReq.reqSrc].readResp;
       $display("rburst [%d]: %x", brCount, rburst);
-      if (brCount == (currReq.numRows*fromInteger(valueOf(BURSTS_PER_ROW)))-1) begin
-	 //if (brCount == currReq.numRows*32-1) begin
-	 brCount <= 0;
-	 state <= TEST_IDLE;
-	 reqInd <= reqInd+1;
-	 $display("TB: done reading bursts");
+      let totalBursts = currReq.numRows * currReq.numCols * fromInteger(valueOf(COLS_PER_BURST));
+
+      if (currReq.reqType == REQ_ALLROWS) begin
+	 if (reduceAnd(rburst) == 1) begin
+	    //if (brCount == currReq.numRows*32-1) begin
+	    state <= TEST_IDLE;
+	    reqInd <= reqInd+1;
+	    $display("TB AR: done reading bursts");
+	 end
       end
       else begin
-	 brCount <= brCount+1;
+	 if (brCount == totalBursts-1) begin
+	    //if (brCount == currReq.numRows*32-1) begin
+	    brCount <= 0;
+	    state <= TEST_IDLE;
+	    reqInd <= reqInd+1;
+	    $display("TB: done reading bursts");
+	 end
+	 else begin
+	    brCount <= brCount+1;
+	 end
       end
    endrule
 	
@@ -136,11 +183,11 @@ module mkXprodTest();
       CmdEntry cmd = CmdEntry {
 			       op: XPROD,
 			       table0Addr: 23,
-			       table0numRows: 2,
-			       table0numCols: 2, //just use max for now
+			       table0numRows: 20,
+			       table0numCols: 7, //just use max for now
 			       table1Addr: 10,
-			       table1numRows: 2,
-			       table1numCols: 2,
+			       table1numRows: 5,
+			       table1numCols: 5,
 			       outputAddr: 50
 			       //colProjectMask: 'h1111
 			       //clauses: testClauses,
@@ -154,26 +201,34 @@ module mkXprodTest();
       let respRows <- xprod.cmdIfc.getAckRows();
       $display("Select done. Num rows = %d", respRows);
       //make req to print results
-      RowReq req = RowReq{rowAddr: 50,
-			  numRows: 4,
+      RowReq req = RowReq{tableAddr: 50,
+			  rowOffset: 0,
+			  numRows: ?,
+			  numCols: 12,
 			  reqSrc: fromInteger(valueOf(DATA_IO_BLK)),
+			  reqType: REQ_NROWS,
 			  op: READ };
       marsh.rowAccesses[valueOf(DATA_IO_BLK)].rowReq(req);
       state <= TEST_PRINT;
    endrule
 
    rule printResults if (state == TEST_PRINT);
-      let rburst = marsh.rowAccesses[valueOf(DATA_IO_BLK)].readResp;
-      $display("rburst [%d]: %x", brCount, rburst);
-      if (brCount == (4*fromInteger(valueOf(BURSTS_PER_ROW)))-1) begin
-	 //if (brCount == currReq.numRows*32-1) begin
-	 brCount <= 0;
+      let rburst <- marsh.rowAccesses[valueOf(DATA_IO_BLK)].readResp;
+      if (printColCnt == 11) begin
+	 printColCnt <= 0;
+	 printRowCnt <= printRowCnt + 1;
+      end
+      else begin
+	 printColCnt <= printColCnt + 1;
+      end
+      $display("rburst [%d][%d]: %x", printRowCnt,printColCnt, rburst);
+      //if (brCount == (20*fromInteger(valueOf(BURSTS_PER_ROW)))-1) begin
+      //if (brCount == currReq.numRows*32-1) begin
+      if (reduceAnd(rburst) == 1) begin
+	 //brCount <= 0;
 	 state <= TEST_IDLE;
 	 $display("TB: done reading bursts");
 	 $finish;
-      end
-      else begin
-	 brCount <= brCount+1;
       end	
    endrule
 
