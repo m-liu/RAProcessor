@@ -14,6 +14,7 @@ typedef enum {DIFFERENCE_IDLE, DIFFERENCE_CP_TABLE0_RD_REQ, DIFFERENCE_OUTER_BUF
 				     
 
 //module mkDifference #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
+(* synthesize *)
 module mkDifference (OPERATOR_IFC);
 
    FIFO#(CmdEntry) cmdQ <- mkFIFO;

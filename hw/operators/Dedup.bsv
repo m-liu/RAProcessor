@@ -14,6 +14,7 @@ typedef enum {DEDUP_IDLE, DEDUP_CP_TABLE0_RD_REQ, DEDUP_OUTER_BUFF_ROW, DEDUP_PR
 				     
 
 //module mkDedup #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
+(* synthesize *)
 module mkDedup (OPERATOR_IFC);
 
    FIFO#(CmdEntry) cmdQ <- mkFIFO;

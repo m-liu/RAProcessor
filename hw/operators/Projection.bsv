@@ -14,6 +14,7 @@ typedef enum {PROJ_IDLE, PROJ_WR_REQ, PROJ_PROCESS_ROW, PROJ_DONE_ROW} ProjState
 				     
 
 //module mkProjection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
+(* synthesize *)
 module mkProjection (OPERATOR_IFC);
 
    FIFO#(CmdEntry) cmdQ <- mkFIFO;

@@ -14,6 +14,7 @@ typedef enum {XPROD_IDLE, XPROD_OUTER_RD_REQ, XPROD_OUTER_BUFF_ROW, XPROD_INNER_
 				     
 
 //module mkXprod #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
+(* synthesize *)
 module mkXprod (OPERATOR_IFC);
 
    FIFO#(CmdEntry) cmdQ <- mkFIFO;

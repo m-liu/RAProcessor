@@ -14,6 +14,7 @@ typedef enum {UNION_IDLE, UNION_CP_TABLE0_WR, UNION_CP_TABLE0, UNION_CP_TABLE1_R
 				     
 
 //module mkUnion #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
+(* synthesize *)
 module mkUnion (OPERATOR_IFC);
 
    FIFO#(CmdEntry) cmdQ <- mkFIFO;

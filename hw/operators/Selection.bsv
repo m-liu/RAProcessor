@@ -44,6 +44,7 @@ function Bit#(32) getPredVal1(SelClause clause, Row rowBuff);
 endfunction
 
 //module mkSelection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
+(* synthesize *)
 module mkSelection (OPERATOR_IFC);
 
 	FIFO#(CmdEntry) cmdQ <- mkFIFO;

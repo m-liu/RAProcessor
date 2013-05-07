@@ -27,6 +27,7 @@ endinterface
 //			OPERATOR_IFC xprodIfc, 
 //			OPERATOR_IFC dedupIfc) (RAController);
 
+(* synthesize *)
 module mkRAController (RAController);
 
 	//FIFO going out to the operators and acks coming back from them
