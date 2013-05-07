@@ -35,6 +35,7 @@ typedef struct {
 
 	//Project
 	Bit#(COL_WIDTH) colProjectMask;
+	Bit#(COL_WIDTH) projColNum; //TODO NEW
 
 	//Union/Diff/Xprod
 	RowAddr table1Addr;

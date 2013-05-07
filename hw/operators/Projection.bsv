@@ -23,7 +23,7 @@ module mkProjection (OPERATOR_IFC);
    FIFO#(RowBurst) rdataQ <- mkFIFO;
    Reg#(ProjState) state <- mkReg(PROJ_IDLE);
    //Reg#(Row) ouputBuff <- mkReg(0);
-   Reg#(RowAddr) rdBurstCnt <- mkReg(0);
+   Reg#(TAdd(TLog#(COL_WIDTH), 1)) rdBurstCnt <- mkReg(0);
    Reg#(RowAddr) wrBurstCnt <- mkReg(0);
    Reg#(RowAddr) rowCnt <- mkReg(0);
 
@@ -33,10 +33,15 @@ module mkProjection (OPERATOR_IFC);
 	
    rule reqRows if (state == PROJ_IDLE);
       //$display("PROJ_IDLE");
-      rowReqQ.enq( RowReq{rowAddr: currCmd.table0Addr,
-			    numRows: currCmd.table0numRows,
-			    reqSrc: fromInteger(valueOf(PROJECTION_BLK)), 
-			    op: READ } );
+      rowReqQ.enq( RowReq{
+					tableAddr: currCmd.table0Addr,
+					rowOffset: 0,
+					//numRows: currCmd.table0numRows,
+					numRows: ?,
+					numCols: currCmd.table0numCols,
+					reqSrc: fromInteger(valueOf(PROJECTION_BLK)), 
+					reqType: REQ_ALLROWS,
+					op: READ } );
       rdBurstCnt <= 0;
       wrBurstCnt <= 0;
       rowCnt <= 0;
@@ -48,41 +53,60 @@ module mkProjection (OPERATOR_IFC);
    
    rule write_req if (state == PROJ_WR_REQ);
       //$display("PROJ_WR_REQ");
-      rowReqQ.enq( RowReq{rowAddr: currCmd.outputAddr,
-			    numRows: currCmd.table0numRows,
-			    reqSrc: fromInteger(valueOf(PROJECTION_BLK)),
-			    op: WRITE });
+      rowReqQ.enq( RowReq{
+					tableAddr: currCmd.outputAddr,
+					rowOffset: 0,
+//					numRows: currCmd.table0numRows,
+					numRows: ?,
+					numCols: currCmd.projColNum,
+					reqSrc: fromInteger(valueOf(PROJECTION_BLK)),
+					reqType: REQ_ALLROWS,
+					op: WRITE });
       state <= PROJ_PROCESS_ROW;
    endrule
    
    rule process_row if (state == PROJ_PROCESS_ROW);
-      if (rdBurstCnt < fromInteger(valueOf(BURSTS_PER_ROW)) ) begin
-	 let rburst = rdataQ.first();
-	 rdataQ.deq();
-	 if ( colProjMask[0] == 1) begin
-	    wdataQ.enq(rburst);
-	    wrBurstCnt <= wrBurstCnt+1;
-	 end
-	 rdBurstCnt <= rdBurstCnt+1;
-	 //circular right shift
-	 colProjMask <= {colProjMask[0], (colProjMask >> 1)[valueOf(COL_WIDTH)-2:0]};
-      end
-      else begin
-	 if ( wrBurstCnt < fromInteger(valueOf(BURSTS_PER_ROW)) ) begin
-	    wdataQ.enq(0);
-	    wrBurstCnt <= wrBurstCnt+1;
-	 end
-	 else begin
-	    rowCnt <= rowCnt+1;
-	    rdBurstCnt <= 0;
-	    wrBurstCnt <= 0;
-	    if (rowCnt+1 >= currCmd.table0numRows) begin
-	       cmdQ.deq();
-	       ackRows.enq(currCmd.table0numRows);
-	       state <= PROJ_IDLE;
-	    end
-	 end
-      end
+	  // if (rdBurstCnt < fromInteger(valueOf(BURSTS_PER_ROW)) ) begin
+	 // if (rdBurstCnt < currCmd.table0numCols ) begin
+		   let rburst = rdataQ.first();
+		   rdataQ.deq();
+
+			//check if we're at the end
+			if (reduceAnd(rburst) == 1) begin
+				cmdQ.deq();
+				wdataQ.enq(rburst); //enq the end of table marker
+				ackRows.enq(rowCnt);
+				state <= PROJ_IDLE;
+			end
+			else begin
+			   if ( colProjMask[rdBurstCnt] == 1) begin
+				   wdataQ.enq(rburst);
+			   //   wrBurstCnt <= wrBurstCnt+1;
+			   end
+			   if (rdBurstCnt == truncate(currCmd.table0numCols-1) )begin
+				   rdBurstCnt <= 0;
+				   rowCnt <= rowCnt+1;
+			   end
+			   else begin
+				   rdBurstCnt <= rdBurstCnt+1;
+			   end
+		   end
+		   //circular right shift
+		   //colProjMask <= {colProjMask[0], (colProjMask >> 1)[valueOf(COL_WIDTH)-2:0]};
+	   //end
+	   /*
+	   else begin
+		   rdBurstCnt <= 0;
+
+		   rowCnt <= rowCnt+1;
+		   wrBurstCnt <= 0;
+		   if (rowCnt+1 >= currCmd.table0numRows) begin
+			   cmdQ.deq();
+			   ackRows.enq(currCmd.table0numRows);
+			   state <= PROJ_IDLE;
+		   end
+	   end
+	   */
    endrule
 
 
