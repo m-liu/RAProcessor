@@ -15,7 +15,7 @@ typedef enum {UNION_IDLE, UNION_CP_TABLE0_WR, UNION_CP_TABLE0, UNION_CP_TABLE1_R
 
 //module mkUnion #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 (* synthesize *)
-module mkUnion (OPERATOR_IFC);
+module mkUnion (BINARY_OPERATOR_IFC);
 
    FIFO#(CmdEntry) cmdQ <- mkFIFO;
    FIFO#(RowAddr) ackRows <- mkFIFO;
@@ -68,13 +68,15 @@ module mkUnion (OPERATOR_IFC);
    
    rule cp_table0_wr if ( state == UNION_CP_TABLE0_WR);
       //$display("UNION_CP_TABLE0_WR_REQ");
-      rowReqQ.enq(RowReq{tableAddr: currCmd.outputAddr,
-			 rowOffset: 0,
-			 numRows: ?,
-			 numCols: ?,
-			 reqSrc: fromInteger(valueOf(UNION_BLK)),
-			 reqType: REQ_ALLROWS,
-			 op: WRITE });
+	  if (currCmd.outputDest == MEMORY) begin
+		  rowReqQ.enq(RowReq{tableAddr: currCmd.outputAddr,
+							  rowOffset: 0,
+							  numRows: ?,
+							  numCols: ?,
+							  reqSrc: fromInteger(valueOf(UNION_BLK)),
+							  reqType: REQ_ALLROWS,
+							  op: WRITE });
+	  end
       state <= UNION_CP_TABLE0;
    endrule
    
@@ -253,6 +255,16 @@ module mkUnion (OPERATOR_IFC);
       end
    endrule
    
+	//interface vector
+   Vector#(NUM_BINARY_INTEROP_OUT, INTEROP_SERVER_IFC) interOut = newVector();
+	for (Integer ind=0; ind < valueOf(NUM_BINARY_INTEROP_OUT); ind=ind+1) begin
+	 	interOut[ind] = interface INTEROP_SERVER_IFC; 
+							method ActionValue#(RowBurst) readResp();
+								wdataQ.deq();
+								return wdataQ.first();
+							endmethod
+						endinterface;
+	end
 	 
    
 
@@ -284,6 +296,7 @@ module mkUnion (OPERATOR_IFC);
 		endmethod
 	endinterface
 
+	interface interOutIfc = interOut;
 
 
 endmodule

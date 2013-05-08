@@ -36,12 +36,12 @@ module [Module] mkRAProcessor(RAProcessor);
 //   OPERATOR_IFC xprodOp <- mkXprod(rowMarshaller.rowAccesses[valueOf(XPROD_BLK)]);
 //   OPERATOR_IFC dedupOp <- mkDedup(rowMarshaller.rowAccesses[valueOf(DEDUP_BLK)]);
 
-   OPERATOR_IFC selectionOp <- mkSelection();
-   OPERATOR_IFC projectionOp <- mkProjection();
-   OPERATOR_IFC unionOp <- mkUnion();
-   OPERATOR_IFC diffOp <- mkDifference();
-   OPERATOR_IFC xprodOp <- mkXprod();
-   OPERATOR_IFC dedupOp <- mkDedup();
+   UNARY_OPERATOR_IFC selectionOp <- mkSelection();
+   UNARY_OPERATOR_IFC projectionOp <- mkProjection();
+   BINARY_OPERATOR_IFC unionOp <- mkUnion();
+   BINARY_OPERATOR_IFC diffOp <- mkDifference();
+   BINARY_OPERATOR_IFC xprodOp <- mkXprod();
+   BINARY_OPERATOR_IFC dedupOp <- mkDedup();
    
    RAController raController <- mkRAController();
    
@@ -52,6 +52,19 @@ module [Module] mkRAProcessor(RAProcessor);
    mkConnection(rowMarshaller.rowAccesses[valueOf(DIFFERENCE_BLK)], diffOp.rowIfc);
    mkConnection(rowMarshaller.rowAccesses[valueOf(XPROD_BLK)], xprodOp.rowIfc);
    mkConnection(rowMarshaller.rowAccesses[valueOf(DEDUP_BLK)], dedupOp.rowIfc);
+
+   //connect the operators to each other. Binary operators -> unary operators; unary operators -> unary operators
+   mkConnection(unionOp.interOutIfc[0], selectionOp.interInIfc[0]);
+   mkConnection(unionOp.interOutIfc[1], projectionOp.interInIfc[0]);
+   mkConnection(diffOp.interOutIfc[0], selectionOp.interInIfc[1]);
+   mkConnection(diffOp.interOutIfc[1], projectionOp.interInIfc[1]);
+   mkConnection(xprodOp.interOutIfc[0], selectionOp.interInIfc[2]);
+   mkConnection(xprodOp.interOutIfc[1], projectionOp.interInIfc[2]);
+   mkConnection(dedupOp.interOutIfc[0], selectionOp.interInIfc[3]);
+   mkConnection(dedupOp.interOutIfc[1], projectionOp.interInIfc[3]);
+
+   mkConnection(selectionOp.interOutIfc, projectionOp.interInIfc[4]);
+   mkConnection(projectionOp.interOutIfc, selectionOp.interInIfc[4]);
 
    //connect the controller to all the operators
    mkConnection(selectionOp.cmdIfc, raController.cmdIfcs[valueOf(SELECTION_BLK)]);

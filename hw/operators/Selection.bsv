@@ -198,8 +198,8 @@ module mkSelection (UNARY_OPERATOR_IFC);
 	endrule
 
 	//interface vector
-	Vector#(4, INTEROP_CLIENT_IFC) interIn = newVector();
-	for (Integer ind=0; ind < 4; ind=ind+1) begin
+	Vector#(NUM_UNARY_INTEROP_IN, INTEROP_CLIENT_IFC) interIn = newVector();
+	for (Integer ind=0; ind < valueOf(NUM_UNARY_INTEROP_IN); ind=ind+1) begin
 		interIn[ind] = 	interface INTEROP_CLIENT_IFC;
 							method Action readResp(RowBurst rData);
 								//all try to enq into rdata fifo, 

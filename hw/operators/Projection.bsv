@@ -15,7 +15,7 @@ typedef enum {PROJ_IDLE, PROJ_WR_REQ, PROJ_PROCESS_ROW, PROJ_DONE_ROW} ProjState
 
 //module mkProjection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 (* synthesize *)
-module mkProjection (OPERATOR_IFC);
+module mkProjection (UNARY_OPERATOR_IFC);
 
    FIFO#(CmdEntry) cmdQ <- mkFIFO;
    FIFO#(RowAddr) ackRows <- mkFIFO;
@@ -35,15 +35,18 @@ module mkProjection (OPERATOR_IFC);
 	
    rule reqRows if (state == PROJ_IDLE);
       //$display("PROJ_IDLE");
-      rowReqQ.enq( RowReq{
-					tableAddr: currCmd.table0Addr,
-					rowOffset: 0,
-					//numRows: currCmd.table0numRows,
-					numRows: ?,
-					numCols: currCmd.table0numCols,
-					reqSrc: fromInteger(valueOf(PROJECTION_BLK)), 
-					reqType: REQ_ALLROWS,
-					op: READ } );
+	  if (currCmd.inputSrc == MEMORY) begin
+		  rowReqQ.enq( RowReq{
+						tableAddr: currCmd.table0Addr,
+						rowOffset: 0,
+						//numRows: currCmd.table0numRows,
+						numRows: ?,
+						numCols: currCmd.table0numCols,
+						reqSrc: fromInteger(valueOf(PROJECTION_BLK)), 
+						reqType: REQ_ALLROWS,
+						op: READ } );
+      end
+
       rdBurstCnt <= 0;
       wrBurstCnt <= 0;
       rowCnt <= 0;
@@ -55,7 +58,8 @@ module mkProjection (OPERATOR_IFC);
    
    rule write_req if (state == PROJ_WR_REQ);
       //$display("PROJ_WR_REQ");
-      rowReqQ.enq( RowReq{
+	  if (currCmd.outputDest == MEMORY) begin
+      		rowReqQ.enq( RowReq{
 					tableAddr: currCmd.outputAddr,
 					rowOffset: 0,
 //					numRows: currCmd.table0numRows,
@@ -64,6 +68,8 @@ module mkProjection (OPERATOR_IFC);
 					reqSrc: fromInteger(valueOf(PROJECTION_BLK)),
 					reqType: REQ_ALLROWS,
 					op: WRITE });
+      end
+
       state <= PROJ_PROCESS_ROW;
    endrule
    
@@ -113,6 +119,19 @@ module mkProjection (OPERATOR_IFC);
 
 
 
+	//interface vector
+	Vector#(NUM_UNARY_INTEROP_IN, INTEROP_CLIENT_IFC) interIn = newVector();
+	for (Integer ind=0; ind < valueOf(NUM_UNARY_INTEROP_IN); ind=ind+1) begin
+		interIn[ind] = 	interface INTEROP_CLIENT_IFC;
+							method Action readResp(RowBurst rData);
+								//all try to enq into rdata fifo, 
+								//but really only one is active at a time
+								rdataQ.enq(rData); 
+							endmethod
+						endinterface;
+	end
+
+
 	//Interface definitions. 
 	interface ROW_ACCESS_CLIENT_IFC rowIfc;
 		method ActionValue#(RowReq) rowReq();
@@ -140,5 +159,16 @@ module mkProjection (OPERATOR_IFC);
 			return ackRows.first();
 		endmethod
 	endinterface
+
+
+	interface interInIfc = interIn;
+
+	interface INTEROP_SERVER_IFC interOutIfc;
+		method ActionValue#(RowBurst) readResp();
+			wdataQ.deq();
+			return wdataQ.first();
+		endmethod
+	endinterface
+
 
 endmodule

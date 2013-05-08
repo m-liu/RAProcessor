@@ -15,7 +15,7 @@ typedef enum {DIFFERENCE_IDLE, DIFFERENCE_CP_TABLE0_RD_REQ, DIFFERENCE_OUTER_BUF
 
 //module mkDifference #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 (* synthesize *)
-module mkDifference (OPERATOR_IFC);
+module mkDifference (BINARY_OPERATOR_IFC);
 
    FIFO#(CmdEntry) cmdQ <- mkFIFO;
    FIFO#(RowAddr) ackRows <- mkFIFO;
@@ -31,10 +31,6 @@ module mkDifference (OPERATOR_IFC);
    Reg#(RowAddr) outer_rdBurstCnt <- mkReg(0);
    Reg#(RowAddr) inner_rdBurstCnt <- mkReg(0);
    Reg#(RowAddr) wrBurstCnt <- mkReg(0);
-   //Reg#(RowAddr) table0ColCnt <- mkReg(0);
-   //Reg#(RowAddr) outer_rowCnt <- mkReg(0);
-   //Reg#(RowAddr) inner_rowCnt <- mkReg(0);
-   //Reg#(RowAddr) total_rowCnt <- mkReg(0);
    Reg#(Bool) match_found <- mkReg(True);
    Reg#(Bool) scan_rows <- mkReg(True);
 
@@ -49,17 +45,16 @@ module mkDifference (OPERATOR_IFC);
       outer_rdBurstCnt <= 0;
       inner_rdBurstCnt <= 0;
       wrBurstCnt <= 0;
-      //table0ColCnt <= 0;
-      //outer_rowCnt <= 0;
-      //inner_rowCnt <= 0;
-      //total_rowCnt <= 0;
-      rowReqQ.enq(RowReq{tableAddr: currCmd.outputAddr,
-			 rowOffset: 0,
-			 numRows: ?,
-			 numCols: ?,
-			 reqSrc: fromInteger(valueOf(DIFFERENCE_BLK)),
-			 reqType: REQ_ALLROWS,
-			 op: WRITE });
+	  //if output to memory, make the request
+	  if (currCmd.outputDest == MEMORY) begin
+		  rowReqQ.enq(RowReq{tableAddr: currCmd.outputAddr,
+							  rowOffset: 0,
+							  numRows: ?,
+							  numCols: ?,
+							  reqSrc: fromInteger(valueOf(DIFFERENCE_BLK)),
+							  reqType: REQ_ALLROWS,
+							  op: WRITE });
+	  end
       
       state <= DIFFERENCE_CP_TABLE0_RD_REQ;
    endrule
@@ -178,7 +173,16 @@ module mkDifference (OPERATOR_IFC);
       end
    endrule
    
-	 
+	//interface vector
+   Vector#(NUM_BINARY_INTEROP_OUT, INTEROP_SERVER_IFC) interOut = newVector();
+	for (Integer ind=0; ind < valueOf(NUM_BINARY_INTEROP_OUT); ind=ind+1) begin
+	 	interOut[ind] = interface INTEROP_SERVER_IFC; 
+							method ActionValue#(RowBurst) readResp();
+								wdataQ.deq();
+								return wdataQ.first();
+							endmethod
+						endinterface;
+	end
    
 	//Interface definitions. 
 	interface ROW_ACCESS_CLIENT_IFC rowIfc;
@@ -207,6 +211,8 @@ module mkDifference (OPERATOR_IFC);
 			return ackRows.first();
 		endmethod
 	endinterface
+
+	interface interOutIfc = interOut;
 
 
 

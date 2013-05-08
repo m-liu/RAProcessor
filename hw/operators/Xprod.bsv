@@ -15,7 +15,7 @@ typedef enum {XPROD_IDLE, XPROD_OUTER_RD_REQ, XPROD_OUTER_BUFF_ROW, XPROD_INNER_
 
 //module mkXprod #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 (* synthesize *)
-module mkXprod (OPERATOR_IFC);
+module mkXprod (BINARY_OPERATOR_IFC);
 
    FIFO#(CmdEntry) cmdQ <- mkFIFO;
    FIFO#(RowAddr) ackRows <- mkFIFO;
@@ -53,13 +53,15 @@ module mkXprod (OPERATOR_IFC);
       //outer_rowCnt <= 0;
       //inner_rowCnt <= 0;
       total_rowCnt <= 0;
-      rowReqQ.enq( RowReq{tableAddr: currCmd.outputAddr,
-			  rowOffset: 0,
-			  numRows: ?,
-			  numCols: ?,
-			  reqSrc: fromInteger(valueOf(XPROD_BLK)),
-			  reqType: REQ_ALLROWS,
-			  op: WRITE });
+	  if (currCmd.outputDest == MEMORY) begin
+		  rowReqQ.enq( RowReq{tableAddr: currCmd.outputAddr,
+				  rowOffset: 0,
+				  numRows: ?,
+				  numCols: ?,
+				  reqSrc: fromInteger(valueOf(XPROD_BLK)),
+				  reqType: REQ_ALLROWS,
+				  op: WRITE });
+	  end
       state <= XPROD_OUTER_RD_REQ;
    endrule
    
@@ -179,6 +181,16 @@ module mkXprod (OPERATOR_IFC);
       
    endrule
 
+	//interface vector
+   Vector#(NUM_BINARY_INTEROP_OUT, INTEROP_SERVER_IFC) interOut = newVector();
+	for (Integer ind=0; ind < valueOf(NUM_BINARY_INTEROP_OUT); ind=ind+1) begin
+	 	interOut[ind] = interface INTEROP_SERVER_IFC; 
+							method ActionValue#(RowBurst) readResp();
+								wdataQ.deq();
+								return wdataQ.first();
+							endmethod
+						endinterface;
+	end
 
    //Interface definitions. 
    interface ROW_ACCESS_CLIENT_IFC rowIfc;
@@ -208,5 +220,6 @@ module mkXprod (OPERATOR_IFC);
       endmethod
    endinterface
 
+	interface interOutIfc = interOut;
 
 endmodule

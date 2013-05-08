@@ -11,6 +11,10 @@ import ControllerTypes::*;
 
 //TODO side interface to other operators
 
+typedef 5 NUM_UNARY_INTEROP_IN;
+typedef 2 NUM_BINARY_INTEROP_OUT;
+
+
 //TODO remove this
 interface OPERATOR_IFC;
 	interface ROW_ACCESS_CLIENT_IFC rowIfc;
@@ -20,16 +24,16 @@ endinterface
 interface UNARY_OPERATOR_IFC;
 	interface ROW_ACCESS_CLIENT_IFC rowIfc;
 	interface CMD_SERVER_IFC cmdIfc;
-	//side interfaces to other operators. 4 from binary ops, 1 to other unary op
+	//side interfaces to other operators. 4 from binary ops, 1 to other unary op, 1 from other unary op
 	interface INTEROP_SERVER_IFC interOutIfc;
-	interface Vector#(4, INTEROP_CLIENT_IFC) interInIfc;
+	interface Vector#(NUM_UNARY_INTEROP_IN, INTEROP_CLIENT_IFC) interInIfc;
 endinterface
 
 interface BINARY_OPERATOR_IFC;
 	interface ROW_ACCESS_CLIENT_IFC rowIfc;
 	interface CMD_SERVER_IFC cmdIfc;
 	//side interfaces to other operators. 2 to unary ops
-	interface Vector#(2, INTEROP_SERVER_IFC) interOutIfc;
+	interface Vector#(NUM_BINARY_INTEROP_OUT, INTEROP_SERVER_IFC) interOutIfc;
 endinterface
 
 

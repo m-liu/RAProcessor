@@ -15,7 +15,7 @@ typedef enum {DEDUP_IDLE, DEDUP_CP_TABLE0_RD_REQ, DEDUP_OUTER_BUFF_ROW, DEDUP_PR
 
 //module mkDedup #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 (* synthesize *)
-module mkDedup (OPERATOR_IFC);
+module mkDedup (BINARY_OPERATOR_IFC);
 
    FIFO#(CmdEntry) cmdQ <- mkFIFO;
    FIFO#(RowAddr) ackRows <- mkFIFO;
@@ -54,13 +54,16 @@ module mkDedup (OPERATOR_IFC);
       //inner_rowCnt <= 0;
       //total_rowCnt <= 0;
       state <= DEDUP_CP_TABLE0_RD_REQ;
-      rowReqQ.enq(RowReq{tableAddr: currCmd.outputAddr,
+	  //if output to memory, make the request
+	  if (currCmd.outputDest == MEMORY) begin
+      	rowReqQ.enq(RowReq{tableAddr: currCmd.outputAddr,
 			 rowOffset: 0,
 			 numRows: ?,
 			 numCols: ?,
 			 reqSrc: fromInteger(valueOf(DEDUP_BLK)),
 			 reqType: REQ_ALLROWS,
 			 op: WRITE });
+	   end
    endrule
    
    rule outer_loop_rd_req if (state == DEDUP_CP_TABLE0_RD_REQ);
@@ -193,6 +196,16 @@ module mkDedup (OPERATOR_IFC);
    endrule
    
 	 
+	//interface vector
+   Vector#(NUM_BINARY_INTEROP_OUT, INTEROP_SERVER_IFC) interOut = newVector();
+	for (Integer ind=0; ind < valueOf(NUM_BINARY_INTEROP_OUT); ind=ind+1) begin
+	 	interOut[ind] = interface INTEROP_SERVER_IFC; 
+							method ActionValue#(RowBurst) readResp();
+								wdataQ.deq();
+								return wdataQ.first();
+							endmethod
+						endinterface;
+	end
    
 
 
@@ -223,6 +236,8 @@ module mkDedup (OPERATOR_IFC);
 			return ackRows.first();
 		endmethod
 	endinterface
+
+	interface interOutIfc = interOut;
 
 
 endmodule
