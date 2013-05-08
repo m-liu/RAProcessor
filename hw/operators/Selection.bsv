@@ -45,7 +45,7 @@ endfunction
 
 //module mkSelection #(ROW_ACCESS_IFC rowIfc) (OPERATOR_IFC);
 (* synthesize *)
-module mkSelection (OPERATOR_IFC);
+module mkSelection (UNARY_OPERATOR_IFC);
 
 	FIFO#(CmdEntry) cmdQ <- mkFIFO;
 	FIFO#(RowAddr) ackRows <- mkFIFO;
@@ -63,7 +63,9 @@ module mkSelection (OPERATOR_IFC);
 	
 	//send req to read rows
 	rule reqRows if (state == SEL_IDLE);
-		rowReqQ.enq( RowReq{ //rowAddr: currCmd.table0Addr + inputAddrCnt,
+		//if data is coming from DRAM
+		if (currCmd.inputSrc == MEMORY) begin
+			rowReqQ.enq( RowReq{ //rowAddr: currCmd.table0Addr + inputAddrCnt,
 								tableAddr: currCmd.table0Addr,
 								rowOffset: 0,
 							//	numRows: currCmd.table0numRows,
@@ -72,13 +74,16 @@ module mkSelection (OPERATOR_IFC);
 								reqSrc: fromInteger(valueOf(SELECTION_BLK)),
 								reqType: REQ_ALLROWS,
 								op: READ } );
+		end
 		rowBuff <= 0;
 		rowBurstCnt <= 0;
 		state <= SEL_REQWRITE_ROW;
 	endrule
 
 	rule reqWriteRow if (state == SEL_REQWRITE_ROW);
-		rowReqQ.enq( RowReq{ 
+		//if data is going out to DRAM
+		if (currCmd.outputDest == MEMORY) begin
+			rowReqQ.enq( RowReq{ 
 								tableAddr: currCmd.outputAddr,
 								rowOffset: 0,
 								numRows: ?,
@@ -86,6 +91,8 @@ module mkSelection (OPERATOR_IFC);
 								reqSrc: fromInteger(valueOf(SELECTION_BLK)), 
 								reqType: REQ_ALLROWS,
 								op: WRITE } );
+		end
+
 		state <= SEL_BUFFER_ROW;
 		
 	endrule
@@ -163,20 +170,6 @@ module mkSelection (OPERATOR_IFC);
 	endrule
 	
 	
-//	rule acceptRow if (state == SEL_ACCEPT_ROW);
-//		rowReqQ.enq( RowReq{ 
-//								tableAddr: currCmd.outputAddr,
-//								rowOffset: outputAddrCnt,
-//								numRows: 1,
-//								numCols: currCmd.table0numCols,
-//								reqSrc: fromInteger(valueOf(SELECTION_BLK)), 
-//								reqType: REQ_NROWS,
-//								op: WRITE } );
-//		outputAddrCnt <= outputAddrCnt + 1;
-//		
-//		state <= SEL_WRITE_ROW;
-//		
-//	endrule
 
 	rule writeRow if (state == SEL_WRITE_ROW);
 		if (rowBurstCnt < currCmd.table0numCols ) begin
@@ -196,14 +189,6 @@ module mkSelection (OPERATOR_IFC);
 		//ack, deq cmdQ, write EOT marker
 		wdataQ.enq ( -1 );
 
-//		rowReqQ.enq( RowReq{
-//							tableAddr: currCmd.outputAddr,
-//							rowOffset: outputAddrCnt,
-//							numRows: 8,
-//							numCols: currCmd.table0numCols,
-//							reqSrc: fromInteger(valueOf(SELECTION_BLK)),
-//							reqType: REQ_EOT,
-//							op: WRITE} );
 		inputAddrCnt <= 0;
 		cmdQ.deq();
 		ackRows.enq(outputAddrCnt);
@@ -212,6 +197,17 @@ module mkSelection (OPERATOR_IFC);
 
 	endrule
 
+	//interface vector
+	Vector#(4, INTEROP_CLIENT_IFC) interIn = newVector();
+	for (Integer ind=0; ind < 4; ind=ind+1) begin
+		interIn[ind] = 	interface INTEROP_CLIENT_IFC;
+							method Action readResp(RowBurst rData);
+								//all try to enq into rdata fifo, 
+								//but really only one is active at a time
+								rdataQ.enq(rData); 
+							endmethod
+						endinterface;
+	end
 
 	//Interface definitions. 
 	interface ROW_ACCESS_CLIENT_IFC rowIfc;
@@ -229,8 +225,6 @@ module mkSelection (OPERATOR_IFC);
 	endinterface 
 
 	interface CMD_SERVER_IFC cmdIfc; 
-
-		//interface definition
 		method Action pushCommand (CmdEntry cmdEntry);
 			cmdQ.enq(cmdEntry);
 		endmethod
@@ -238,6 +232,16 @@ module mkSelection (OPERATOR_IFC);
 		method ActionValue#( Bit#(31) ) getAckRows();
 			ackRows.deq();
 			return ackRows.first();
+		endmethod
+	endinterface
+
+	
+	interface interInIfc = interIn;
+
+	interface INTEROP_SERVER_IFC interOutIfc;
+		method ActionValue#(RowBurst) readResp();
+			wdataQ.deq();
+			return wdataQ.first();
 		endmethod
 	endinterface
 

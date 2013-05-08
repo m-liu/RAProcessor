@@ -13,7 +13,7 @@ import XilinxDDR2::*;
 import DDR2::*;
 
 
-typedef enum { TEST_IDLE, TEST_REQ, TEST_WR, TEST_RD, TEST_DONE, TEST_SELECT, TEST_WAIT, TEST_PRINT } TestState deriving (Eq, Bits);
+typedef enum { TEST_IDLE, TEST_STREAM, TEST_REQ, TEST_WR, TEST_RD, TEST_DONE, TEST_SELECT, TEST_WAIT, TEST_PRINT } TestState deriving (Eq, Bits);
 
 
 //typedef 3 SEL_OP;
@@ -22,7 +22,7 @@ typedef 3 NUM_TESTS;
 module mkSelectionTest();
 	DDR2_User ddrServer <- mkDDR2Simulator();
 	ROW_MARSHALLER_IFC marsh <- mkRowMarshaller();
-	OPERATOR_IFC selection <- mkSelection();
+	UNARY_OPERATOR_IFC selection <- mkSelection();
 	
 	//connect ddr and marshaller
 	mkConnection(marsh.ddrMem, ddrServer);
@@ -170,12 +170,35 @@ module mkSelectionTest();
 							table0Addr: 23,
 							table0numRows: 20,
 							table0numCols: 7, 
+							//test input data from anoterh operator
+							inputSrc: PROJECT,
+							outputDest: MEMORY,
+
 							outputAddr: 50, 
 							clauses: testClauses,
 							validClauseMask: 'h11 //OR
 						};
 		selection.cmdIfc.pushCommand(cmd);	
-		state <= TEST_WAIT;
+			brCount <= 0;
+		//state <= TEST_WAIT;
+		state <= TEST_STREAM;
+	endrule
+
+	rule streamSelect if (state == TEST_STREAM);
+		if (brCount < (5 * 7 * fromInteger(valueOf(COLS_PER_BURST)))) begin
+			brCount <= brCount+1;
+			selection.interInIfc[2].readResp(someData); //actually sending data to SELECT
+			someData <= someData+1;
+			$display("TB feeding burst [%d]: %x", brCount, someData);
+		end
+		else begin
+			selection.interInIfc[2].readResp(-1); //actually sending data to SELECT
+			$display("TB feeding LAST burst [%d]: -1", brCount);
+			brCount <= 0;
+			state <= TEST_WAIT;
+			$display("TB: done sending bursts to SELECT");
+		end
+		
 	endrule
 
 	rule waitSelect if (state == TEST_WAIT);
