@@ -52,8 +52,68 @@ typedef struct {
 function Fmt showCmd(CmdEntry cmdEntry);
    Fmt ret = fshow("");
    ret = $format("\ncmdEntry.op=%d\n", cmdEntry.op);
-   ret = ret + $format("cmdEntry 1st input table: %d rows x %d cols @ addr=%d\n", cmdEntry.table0numRows, cmdEntry.table0numCols, cmdEntry.table0Addr);
-   ret = ret + $format("cmdEntry output table addr=%d\n", cmdEntry.outputAddr);
+   case (cmdEntry.inputSrc)
+      SELECT:
+      begin
+	 ret = ret + $format("cmdEntry input table source: SELECT\n");
+      end
+      PROJECT:
+      begin
+	 ret = ret + $format("cmdEntry input table source: PROJECT\n");
+      end
+      UNION:
+      begin
+	 ret = ret + $format("cmdEntry input table source: UNION\n");
+      end
+      DIFFERENCE:
+      begin
+	 ret = ret + $format("cmdEntry input table source: DIFFERENCE\n");
+      end
+      XPROD:
+      begin
+	 ret = ret + $format("cmdEntry input table source: XPROD\n");
+      end
+      DEDUP:
+      begin
+	 ret = ret + $format("cmdEntry input table source: DEDUP\n");
+      end
+      MEMORY:
+      begin
+	 ret = ret + $format("cmdEntry 1st input table source: MEMORY %d rows x %d cols @ addr=%d\n", cmdEntry.table0numRows, cmdEntry.table0numCols, cmdEntry.table0Addr);
+      end
+   endcase
+   
+   case (cmdEntry.outputDest)
+      SELECT:
+      begin
+	 ret = ret + $format("cmdEntry ouput table destination: SELECT\n");
+      end
+      PROJECT:
+      begin
+	 ret = ret + $format("cmdEntry ouput table destination: PROJECT\n");
+      end
+      UNION:
+      begin
+	 ret = ret + $format("cmdEntry ouput table destination: UNION\n");
+      end
+      DIFFERENCE:
+      begin
+	 ret = ret + $format("cmdEntry ouput table destination: DIFFERENCE\n");
+      end
+      XPROD:
+      begin
+	 ret = ret + $format("cmdEntry ouput table destination: XPROD\n");
+      end
+      DEDUP:
+      begin
+	 ret = ret + $format("cmdEntry ouput table destination: DEDUP\n");
+      end
+      MEMORY:
+      begin
+	 ret = ret + $format("cmdEntry output table destinaton: Memory addr=%d\n", cmdEntry.outputAddr);
+      end
+   endcase
+   
 
    case (cmdEntry.op)
       SELECT: 

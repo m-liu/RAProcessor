@@ -10,6 +10,8 @@
 
 #include <stdint.h> 
 
+#include <vector>
+
 #define MAX_COLS 32
 #define MAX_MEM_ROWS (1<<16)
 #define MAX_CHARS 256
@@ -74,6 +76,9 @@ extern uint32_t globalNextAddr;
 
 extern CmdEntry_sw globalCmdEntryBuff[MAX_NUM_CMDS];
 extern uint32_t globalNCmds;
+
+extern std::vector<uint32_t> schedule[MAX_NUM_CMDS];
+extern uint32_t numScheds;
 
 //Global access functions
 /*

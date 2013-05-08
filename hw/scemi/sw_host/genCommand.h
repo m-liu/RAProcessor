@@ -9,11 +9,11 @@
 #include <cstdlib>
 
 #include <stdint.h> 
-#include "SceMiHeaders.h"
+//#include "SceMiHeaders.h"
 
 uint32_t genCommand(const char *cmdFilePath, CmdEntry_sw *cmdEntryBuff);
 
-void loadCommands(InportProxyT<BuffInit> & cmdBuffRequest, CmdEntry_sw *cmdEntryBuff);
+
 
 void dumpCmdEntry(CmdEntry_sw cmdEntry);
 void dumpTableMetas();

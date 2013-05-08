@@ -34,6 +34,6 @@ scemi-tb
 build-for: c++
 c++-header-directory: tbinclude
 c++-header-aliases: True
-c++-files: ../sw_host/procTop.cpp ../sw_host/tableParser.cpp ../sw_host/genCommand.cpp ../sw_host/globalTypes.cpp ../sw_host/ResetXactor.cpp
+c++-files: ../sw_host/procTop.cpp ../sw_host/tableParser.cpp ../sw_host/genCommand.cpp ../sw_host/globalTypes.cpp ../sw_host/ResetXactor.cpp ../sw_host/linkBlocks.cpp
 exe-file: tb
 

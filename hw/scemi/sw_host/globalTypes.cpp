@@ -10,6 +10,8 @@ uint32_t globalNextAddr = 0;
 CmdEntry_sw globalCmdEntryBuff[MAX_NUM_CMDS];
 uint32_t globalNCmds = 0;
 
+std::vector<uint32_t> schedule[MAX_NUM_CMDS];
+uint32_t numScheds = 0;
 
 /*
 uint32_t getNextMeta (){

@@ -9,6 +9,7 @@
 #include "globalTypes.h"
 #include "tableParser.h"
 #include "genCommand.h" 
+#include "linkBlocks.h"
 //#include "procModel.h"
 
 #include "SceMiHeaders.h"
@@ -62,23 +63,25 @@ int main(int argc, char* argv[]){
 
   
   globalNCmds = genCommand(cmdIn, globalCmdEntryBuff);
-
+  scheduleCmds();
   loadCommands(cmdBuffRequest, globalCmdEntryBuff);
 
   //printf("num of commands: %d", globalNCmds);
   loadCmdBuffSize.sendMessage(globalNCmds);
-  
+  //sleep(1);
+  /*
   printf("command dump BEFORE execution:\n");
   for (uint32_t i=0; i<globalNCmds; i++){
     dumpCmdEntry(globalCmdEntryBuff[i]);
   }
   
   //runProcModel();
-
+  */
+  
   //wait for ack from HW
   uint32_t nRows = getRowAck.getMessage();
   printf("Hardware ack received: nRows=%d", nRows);
-
+  
   /*
   printf("command dump AFTER execution:\n");
   for (uint32_t i=0; i<globalNCmds; i++){
@@ -86,7 +89,7 @@ int main(int argc, char* argv[]){
   }
   dumpTableMetas();
   */
-
+  
   printf("\n************************************\n");
   printf("Final table values:\n");
 
