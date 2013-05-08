@@ -11,7 +11,7 @@ import OperatorCommon::*;
 import RowMarshaller::*;
 import ControllerTypes::*;
 
-typedef enum {SEL_IDLE, SEL_BUFFER_ROW, SEL_PROCESS_ROW, SEL_ACCEPT_ROW, SEL_WRITE_ROW, SEL_DONE_TABLE} SelState deriving (Eq,Bits);
+typedef enum {SEL_IDLE, SEL_BUFFER_ROW, SEL_PROCESS_ROW, SEL_REQWRITE_ROW, SEL_ACCEPT_ROW, SEL_WRITE_ROW, SEL_DONE_TABLE} SelState deriving (Eq,Bits);
 
 function Bool evalPredicate(Bit#(32) val1, Bit#(32) val2, CompOp op); 
 	case (op)
@@ -74,8 +74,23 @@ module mkSelection (OPERATOR_IFC);
 								op: READ } );
 		rowBuff <= 0;
 		rowBurstCnt <= 0;
-		state <= SEL_BUFFER_ROW;
+		state <= SEL_REQWRITE_ROW;
 	endrule
+
+	rule reqWriteRow if (state == SEL_REQWRITE_ROW);
+		rowReqQ.enq( RowReq{ 
+								tableAddr: currCmd.outputAddr,
+								rowOffset: 0,
+								numRows: ?,
+								numCols: currCmd.table0numCols,
+								reqSrc: fromInteger(valueOf(SELECTION_BLK)), 
+								reqType: REQ_ALLROWS,
+								op: WRITE } );
+		state <= SEL_BUFFER_ROW;
+		
+	endrule
+
+
 
 	//buffer a whole row
 	rule bufferRow if (state == SEL_BUFFER_ROW);
@@ -135,11 +150,10 @@ module mkSelection (OPERATOR_IFC);
 						(predResults[12] & predResults[13] & predResults[14] & predResults[15]) );
 
 		if (accept == 1) begin
-			state <= SEL_ACCEPT_ROW;
+			state <= SEL_WRITE_ROW;
 			$display("SELECT: row %d accepted", inputAddrCnt-1);
 		end
 		else begin
-//			state <= SEL_DONE_ROW;
 			state <= SEL_BUFFER_ROW;
 			$display("SELECT: row %d rejected", inputAddrCnt-1);
 		end
@@ -148,20 +162,21 @@ module mkSelection (OPERATOR_IFC);
 
 	endrule
 	
-	rule acceptRow if (state == SEL_ACCEPT_ROW);
-		rowReqQ.enq( RowReq{ 
-								tableAddr: currCmd.outputAddr,
-								rowOffset: outputAddrCnt,
-								numRows: 1,
-								numCols: currCmd.table0numCols,
-								reqSrc: fromInteger(valueOf(SELECTION_BLK)), 
-								reqType: REQ_NROWS,
-								op: WRITE } );
-		outputAddrCnt <= outputAddrCnt + 1;
-		
-		state <= SEL_WRITE_ROW;
-		
-	endrule
+	
+//	rule acceptRow if (state == SEL_ACCEPT_ROW);
+//		rowReqQ.enq( RowReq{ 
+//								tableAddr: currCmd.outputAddr,
+//								rowOffset: outputAddrCnt,
+//								numRows: 1,
+//								numCols: currCmd.table0numCols,
+//								reqSrc: fromInteger(valueOf(SELECTION_BLK)), 
+//								reqType: REQ_NROWS,
+//								op: WRITE } );
+//		outputAddrCnt <= outputAddrCnt + 1;
+//		
+//		state <= SEL_WRITE_ROW;
+//		
+//	endrule
 
 	rule writeRow if (state == SEL_WRITE_ROW);
 		if (rowBurstCnt < currCmd.table0numCols ) begin
@@ -171,23 +186,24 @@ module mkSelection (OPERATOR_IFC);
 		end 
 		else begin
 			rowBurstCnt <= 0;
-			//state <= SEL_DONE_ROW;
+			outputAddrCnt <= outputAddrCnt + 1;
 			state <= SEL_BUFFER_ROW;
 		end
-		
 	endrule
 
 	rule doneTable if (state == SEL_DONE_TABLE);
 		$display("SELECT: done with table");
 		//ack, deq cmdQ, write EOT marker
-		rowReqQ.enq( RowReq{
-							tableAddr: currCmd.outputAddr,
-							rowOffset: outputAddrCnt,
-							numRows: 8,
-							numCols: currCmd.table0numCols,
-							reqSrc: fromInteger(valueOf(SELECTION_BLK)),
-							reqType: REQ_EOT,
-							op: WRITE} );
+		wdataQ.enq ( -1 );
+
+//		rowReqQ.enq( RowReq{
+//							tableAddr: currCmd.outputAddr,
+//							rowOffset: outputAddrCnt,
+//							numRows: 8,
+//							numCols: currCmd.table0numCols,
+//							reqSrc: fromInteger(valueOf(SELECTION_BLK)),
+//							reqType: REQ_EOT,
+//							op: WRITE} );
 		inputAddrCnt <= 0;
 		cmdQ.deq();
 		ackRows.enq(outputAddrCnt);
