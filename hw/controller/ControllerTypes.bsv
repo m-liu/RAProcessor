@@ -6,6 +6,7 @@ import FShow::*;
 typedef 16 MAX_CLAUSES;
 
 typedef enum {SELECT, PROJECT, UNION, DIFFERENCE, XPROD, DEDUP} CmdOp deriving (Eq,Bits);
+typedef enum {SELECT, PROJECT, UNION, DIFFERENCE, XPROD, DEDUP, MEMORY} DataLoc deriving (Eq,Bits);
 
 typedef enum {EQ, LT, LE, GT, GE, NE} CompOp deriving (Eq,Bits);
 typedef enum {COL_COL, COL_VAL} ClauseType deriving (Eq,Bits);
@@ -25,6 +26,10 @@ typedef struct {
 	RowAddr table0numRows;
 	RowAddr table0numCols;
 	RowAddr outputAddr;
+	
+	//Specify where to get/put input/output data
+	DataLoc inputSrc;
+	DataLoc outputDest;
 
 	//Select
 	//Bit#(TLog#(MAX_CLAUSES)) numClauses;		//OBSOLETE
