@@ -194,7 +194,7 @@ bool parsecsv(const char *filename, const uint32_t tb_num, const uint32_t start_
   }
 */
 
-void dumpMemory(InportProxyT<RowReq> &rowReq, OutportQueueT<RowBurst> &rdBurst){
+void printTable(uint32_t tb_num,  InportProxyT<RowReq> &rowReq, OutportQueueT<RowBurst> &rdBurst){
   RowReq request;
   
   MemOp wr_op;
@@ -202,98 +202,63 @@ void dumpMemory(InportProxyT<RowReq> &rowReq, OutportQueueT<RowBurst> &rdBurst){
   
   RowReqType reqType;
   reqType.m_val = RowReqType::e_REQ_ALLROWS;
-  
-  
-  for (uint32_t tb_num = 0; tb_num < globalNextMeta; tb_num++){
-    cout << "Table Name:\t" << globalTableMeta[tb_num].tableName;
-    uint32_t nCols = globalTableMeta[tb_num].numCols;
-    uint32_t nRowsMax = globalTableMeta[tb_num].numRows+32; //for printing purposes when table is empty
-    uint32_t addr_ptr = globalTableMeta[tb_num].startAddr;
-    printf("\tTable Addr: %x",addr_ptr);
-  
-    request.m_tableAddr = addr_ptr;
-    request.m_rowOffset = 0;
-    request.m_numCols = nCols;
-    request.m_reqSrc = 0;
-    request.m_reqType = reqType;
-    request.m_op = wr_op;
-    rowReq.sendMessage(request);
- 
-    cout << "\nColumn Names:\n";  
-    for (uint32_t i = 0; i < nCols; i++){
-      cout << globalTableMeta[tb_num].colNames[i] << "\t";
-    }
-    cout << "\nData:\n";
 
-    uint32_t resp = 0;
-    uint32_t colCnt = 0;
-	uint32_t rowCnt = 0;
-    // while (true) {
-    while ( (resp != 0xFFFFFFFF) && (rowCnt < nRowsMax) ){
-      //printf("here\n");
-      //fflush(stdout);
-      resp = rdBurst.getMessage();
-      
-      if (colCnt == nCols){
-		colCnt = 0;
-		rowCnt++;
-		cout << endl;
-      }
-      
-      cout << resp << "\t";
-      colCnt++;
-    }
-    
-    printf("\n\n");
-	if (rowCnt == nRowsMax) {
-		printf("Note: max nrows reached, stopped printing\n");
-	}
-    //printf("\none table done\n\n");
-    
-  }
-
-  /*
-  reqType.m_val = RowReqType::e_REQ_NROWS;
-  printf("reading a random row\n");
-  cout << "Table Name:\t" << globalTableMeta[globalNextMeta-2].tableName;
-  uint32_t nCols = globalTableMeta[globalNextMeta-2].numCols;
-  uint32_t addr_ptr = globalTableMeta[globalNextMeta-2].startAddr;
+  cout << "Table Name:\t" << globalTableMeta[tb_num].tableName;
+  uint32_t nCols = globalTableMeta[tb_num].numCols;
+  uint32_t nRowsMax = globalTableMeta[tb_num].numRows+32; //for printing purposes when table is empty
+  uint32_t addr_ptr = globalTableMeta[tb_num].startAddr;
   printf("\tTable Addr: %x",addr_ptr);
-
-  cout << "\nColumn Names:\n";  
-    for (uint32_t i = 0; i < nCols; i++){
-      cout << globalTableMeta[globalNextMeta-2].colNames[i] << "\t";
-    }
-    cout << "\nData:\n";
   
   request.m_tableAddr = addr_ptr;
-  request.m_rowOffset = 7;
-  request.m_numRows = 3;
+  request.m_rowOffset = 0;
   request.m_numCols = nCols;
   request.m_reqSrc = 0;
   request.m_reqType = reqType;
   request.m_op = wr_op;
   rowReq.sendMessage(request);
-  
-  uint32_t cnt = nCols * 3;
-  uint32_t colCnt = 0;
+    
+  cout << "\nColumn Names:\n";  
+  for (uint32_t i = 0; i < nCols; i++){
+    cout << globalTableMeta[tb_num].colNames[i] << "\t";
+  }
+  cout << "\nData:\n";
   
   uint32_t resp = 0;
- 
-  while ( cnt-- > 0 ){
+  uint32_t colCnt = 0;
+  uint32_t rowCnt = 0;
+  // while (true) {
+  while ( (resp != 0xFFFFFFFF) && (rowCnt < nRowsMax) ){
+    //printf("here\n");
+      //fflush(stdout);
     resp = rdBurst.getMessage();
     
     if (colCnt == nCols){
       colCnt = 0;
+      rowCnt++;
       cout << endl;
+      }
+    
+      cout << resp << "\t";
+      colCnt++;
     }
-      
-    cout << resp << "\t";
-    colCnt++;
-  }  
-  printf("\n");
-  */
+  
+  printf("\n\n");
+  if (rowCnt == nRowsMax) {
+    printf("Note: max nrows reached, stopped printing\n");
+  }
+  //printf("\none table done\n\n");
+    
 }
+
+void dumpMemory(InportProxyT<RowReq> &rowReq, OutportQueueT<RowBurst> &rdBurst){
+  
+  
+  for (uint32_t tb_num = 0; tb_num < globalNextMeta; tb_num++){
+    printTable(tb_num, rowReq, rdBurst);
+  }
+}
+
+
 
 bool parsecsv(InportProxyT<RowReq> &rowReq, InportProxyT<RowBurst> &wrBurst){
   

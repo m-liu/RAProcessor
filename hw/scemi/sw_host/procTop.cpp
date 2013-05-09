@@ -94,6 +94,12 @@ int main(int argc, char* argv[]){
   */
   
   printf("\n************************************\n");
+  printf("Final table:\n");
+
+  printTable(globalNextMeta-1, rowReq, rdBurst);
+  
+  /*
+  printf("\n************************************\n");
   printf("Final table values:\n");
 
 
