@@ -20,7 +20,8 @@ module mkXprod (BINARY_OPERATOR_IFC);
    FIFO#(CmdEntry) cmdQ <- mkFIFO;
    FIFO#(RowAddr) ackRows <- mkFIFO;
    FIFO#(RowReq) rowReqQ <- mkFIFO;
-   FIFO#(RowBurst) wdataQ <- mkFIFO;
+   FIFO#(RowBurst) wdataSelectQ <- mkFIFO;
+   FIFO#(RowBurst) wdataProjectQ <- mkFIFO;
    FIFO#(RowBurst) wdataMemQ <- mkFIFO;
    FIFO#(RowBurst) rdataQ <- mkFIFO;
    Reg#(XProdState) state <- mkReg(XPROD_IDLE);
@@ -90,7 +91,7 @@ module mkXprod (BINARY_OPERATOR_IFC);
 	 rowBuff[outer_rdBurstCnt] <= rburst;
 	 //rowBuff <= (rowBuff << valueOf(BURST_WIDTH)) | zeroExtended(rburst);
 	 
-	 $display("%h",rburst);
+	 $display("%d",rburst);
 	 
 	 /*
 	 //Right shifts in the bursts
@@ -110,12 +111,21 @@ module mkXprod (BINARY_OPERATOR_IFC);
 				reqType: REQ_EOT,
 				op: WRITE });
 	    */
-	   if (currCmd.outputDest == MEMORY) begin
-		   wdataMemQ.enq(-1);
-	   end
-	   else begin
-		   wdataQ.enq(-1);
-	   end
+	    case (currCmd.outputDest)
+	       MEMORY:
+	       begin
+		  wdataMemQ.enq(-1);
+	       end
+	       SELECT:
+	       begin
+		  wdataSelectQ.enq(-1);
+	       end
+	       PROJECT:
+	       begin
+		  wdataProjectQ.enq(-1);
+	       end
+	    endcase
+	    
 	    $display("outer loop finishes");
 	    cmdQ.deq();
 	    ackRows.enq(total_rowCnt);
@@ -159,27 +169,44 @@ module mkXprod (BINARY_OPERATOR_IFC);
       if ( table0ColCnt < (currCmd.table0numCols)/fromInteger(valueOf(COLS_PER_BURST)) ) begin
 	       
 	 
-	 $display("outer_rd[%d] = %h",table0ColCnt,rowBuff[table0ColCnt]);
-	 if (currCmd.outputDest == MEMORY) begin
-		 wdataMemQ.enq(rowBuff[table0ColCnt]);
-	 end
-	 else begin
-		 wdataQ.enq(rowBuff[table0ColCnt]);
-	 end
+	 $display("outer_rd[%d] = %d",table0ColCnt,rowBuff[table0ColCnt]);
+	 case (currCmd.outputDest)
+	       MEMORY:
+	       begin
+		  wdataMemQ.enq(rowBuff[table0ColCnt]);
+	       end
+	       SELECT:
+	       begin
+		  wdataSelectQ.enq(rowBuff[table0ColCnt]);
+	       end
+	       PROJECT:
+	       begin
+		  wdataProjectQ.enq(rowBuff[table0ColCnt]);
+	       end
+	    endcase
+	   
 	 table0ColCnt <= table0ColCnt + 1;
       end
       else begin
 	 if ( inner_rdBurstCnt < currCmd.table1numCols ) begin
 	    let rBurst = rdataQ.first();
 	    rdataQ.deq(); 
-	    $display("rdBurst[%d] = %h",inner_rdBurstCnt,rBurst);
+	    $display("rdBurst[%d] = %d",inner_rdBurstCnt,rBurst);
 	    inner_rdBurstCnt <= inner_rdBurstCnt + 1;
-		if (currCmd.outputDest == MEMORY) begin
-			wdataMemQ.enq(rBurst);
-		end
-		else begin
-			wdataQ.enq(rBurst);
-		end
+	    case (currCmd.outputDest)
+	       MEMORY:
+	       begin
+		  wdataMemQ.enq(rBurst);
+	       end
+	       SELECT:
+	       begin
+		  wdataSelectQ.enq(rBurst);
+	       end
+	       PROJECT:
+	       begin
+		  wdataProjectQ.enq(rBurst);
+	       end
+	    endcase
 	 end
 	 else begin
 	    let rBurst = rdataQ.first();
@@ -199,14 +226,25 @@ module mkXprod (BINARY_OPERATOR_IFC);
 
 	//interface vector
    Vector#(NUM_BINARY_INTEROP_OUT, INTEROP_SERVER_IFC) interOut = newVector();
-	for (Integer ind=0; ind < valueOf(NUM_BINARY_INTEROP_OUT); ind=ind+1) begin
-	 	interOut[ind] = interface INTEROP_SERVER_IFC; 
-							method ActionValue#(RowBurst) readResp();
-								wdataQ.deq();
-								return wdataQ.first();
-							endmethod
-						endinterface;
-	end
+   for (Integer ind=0; ind < valueOf(NUM_BINARY_INTEROP_OUT); ind=ind+1) begin
+      if ( ind == 0 ) begin
+      interOut[ind] = interface INTEROP_SERVER_IFC; 
+			 method ActionValue#(RowBurst) readResp();
+			    wdataSelectQ.deq();
+			    return wdataSelectQ.first();
+			 endmethod
+		      endinterface;
+      end
+      else begin
+	 interOut[ind] = interface INTEROP_SERVER_IFC; 
+			    method ActionValue#(RowBurst) readResp();
+			       wdataProjectQ.deq();
+			       return wdataProjectQ.first();
+			    endmethod
+			 endinterface;
+      end
+	 
+   end
 
    //Interface definitions. 
    interface ROW_ACCESS_CLIENT_IFC rowIfc;

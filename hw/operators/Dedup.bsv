@@ -20,7 +20,9 @@ module mkDedup (BINARY_OPERATOR_IFC);
    FIFO#(CmdEntry) cmdQ <- mkFIFO;
    FIFO#(RowAddr) ackRows <- mkFIFO;
    FIFO#(RowReq) rowReqQ <- mkFIFO;
-   FIFO#(RowBurst) wdataQ <- mkFIFO;
+   FIFO#(RowBurst) wdataSelectQ <- mkFIFO;
+   FIFO#(RowBurst) wdataProjectQ <- mkFIFO;
+   //FIFO#(RowBurst) wdataQ <- mkFIFO;
    FIFO#(RowBurst) wdataMemQ <- mkFIFO;
    FIFO#(RowBurst) rdataQ <- mkFIFO;
    Reg#(DedupState) state <- mkReg(DEDUP_IDLE);
@@ -99,12 +101,20 @@ module mkDedup (BINARY_OPERATOR_IFC);
 	    cmdQ.deq();
 	    ackRows.enq(outputAddrCnt);
 	    state <= DEDUP_IDLE;
-		if (currCmd.outputDest == MEMORY) begin
-			wdataMemQ.enq(-1);
-		end
-		else begin
-			wdataQ.enq(-1);
-		end
+	    case (currCmd.outputDest)
+	       MEMORY:
+	       begin
+		  wdataMemQ.enq(-1);
+	       end
+	       SELECT:
+	       begin
+		  wdataSelectQ.enq(-1);
+	       end
+	       PROJECT:
+	       begin
+		  wdataProjectQ.enq(-1);
+	       end
+	    endcase
 	    /*
 	    rowReqQ.enq(RowReq{tableAddr: currCmd.outputAddr,
 			 rowOffset: outputAddrCnt,
@@ -191,32 +201,50 @@ module mkDedup (BINARY_OPERATOR_IFC);
    endrule
    */
   rule cp_table1_wr_row if ( state == DEDUP_CP_TABLE0_WR_ROW );
-	  if ( wrBurstCnt < currCmd.table0numCols ) begin
-		  if (currCmd.outputDest == MEMORY) begin
-			  wdataMemQ.enq(rowBuff[wrBurstCnt]);
-		  end
-		  else begin
-			  wdataQ.enq(rowBuff[wrBurstCnt]);
-		  end
-		  wrBurstCnt <= wrBurstCnt + 1;
-	  end
-	  else begin
-		  wrBurstCnt <= 0;
-		  state <= DEDUP_CP_TABLE0_RD_REQ;
-	  end
-   endrule
+     if ( wrBurstCnt < currCmd.table0numCols ) begin
+	case (currCmd.outputDest)
+	    MEMORY:
+	    begin
+	       wdataMemQ.enq(rowBuff[wrBurstCnt]);
+	    end
+	    SELECT:
+	    begin
+	       wdataSelectQ.enq(rowBuff[wrBurstCnt]);
+	    end
+	    PROJECT:
+	    begin
+	       wdataProjectQ.enq(rowBuff[wrBurstCnt]);
+	    end
+	 endcase
+	wrBurstCnt <= wrBurstCnt + 1;
+     end
+     else begin
+	wrBurstCnt <= 0;
+	state <= DEDUP_CP_TABLE0_RD_REQ;
+     end
+  endrule
    
 	 
 	//interface vector
    Vector#(NUM_BINARY_INTEROP_OUT, INTEROP_SERVER_IFC) interOut = newVector();
-	for (Integer ind=0; ind < valueOf(NUM_BINARY_INTEROP_OUT); ind=ind+1) begin
-	 	interOut[ind] = interface INTEROP_SERVER_IFC; 
-							method ActionValue#(RowBurst) readResp();
-								wdataQ.deq();
-								return wdataQ.first();
-							endmethod
-						endinterface;
-	end
+   for (Integer ind=0; ind < valueOf(NUM_BINARY_INTEROP_OUT); ind=ind+1) begin
+      if ( ind == 0 ) begin
+      interOut[ind] = interface INTEROP_SERVER_IFC; 
+			 method ActionValue#(RowBurst) readResp();
+			    wdataSelectQ.deq();
+			    return wdataSelectQ.first();
+			 endmethod
+		      endinterface;
+      end
+      else begin
+	 interOut[ind] = interface INTEROP_SERVER_IFC; 
+			    method ActionValue#(RowBurst) readResp();
+			       wdataProjectQ.deq();
+			       return wdataProjectQ.first();
+			    endmethod
+			 endinterface;
+      end
+   end
    
 
 

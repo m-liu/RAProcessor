@@ -20,8 +20,10 @@ module mkUnion (BINARY_OPERATOR_IFC);
    FIFO#(CmdEntry) cmdQ <- mkFIFO;
    FIFO#(RowAddr) ackRows <- mkFIFO;
    FIFO#(RowReq) rowReqQ <- mkFIFO;
-   FIFO#(RowBurst) wdataQ <- mkFIFO;
-	FIFO#(RowBurst) wdataMemQ <- mkFIFO;
+   FIFO#(RowBurst) wdataSelectQ <- mkFIFO;
+   FIFO#(RowBurst) wdataProjectQ <- mkFIFO;
+   //FIFO#(RowBurst) wdataQ <- mkFIFO;
+   FIFO#(RowBurst) wdataMemQ <- mkFIFO;
    FIFO#(RowBurst) rdataQ <- mkFIFO;
    Reg#(UnionState) state <- mkReg(UNION_IDLE);
    //Reg#(Row) ouputBuff <- mkReg(0);
@@ -89,20 +91,29 @@ module mkUnion (BINARY_OPERATOR_IFC);
 		   state <= UNION_CP_TABLE1_RD_REQ;
 	   end
 	   else begin
-		   if ( outputAddrCnt_Col < currCmd.table0numCols - 1 ) begin
-			   outputAddrCnt_Col <= outputAddrCnt_Col + 1;
-		   end
-		   else begin
-			   outputAddrCnt_Col <= 0;
-			   outputAddrCnt <= outputAddrCnt + 1;
-		   end
+	      if ( outputAddrCnt_Col < currCmd.table0numCols - 1 ) begin
+		 outputAddrCnt_Col <= outputAddrCnt_Col + 1;
+	      end
+	      else begin
+		 outputAddrCnt_Col <= 0;
+		 outputAddrCnt <= outputAddrCnt + 1;
+	      end
+	      
+	      case (currCmd.outputDest)
+		 MEMORY:
+		 begin
+		    wdataMemQ.enq(rBurst);
+		 end
+		 SELECT:
+		 begin
+		    wdataSelectQ.enq(rBurst);
+		 end
+		 PROJECT:
+		 begin
+		    wdataProjectQ.enq(rBurst);
+		 end
+	      endcase
 
-		   if (currCmd.outputDest == MEMORY) begin
-			   wdataMemQ.enq(rBurst);
-		   end
-		   else begin
-			   wdataQ.enq(rBurst);
-		   end
 	   end
       
       
@@ -163,12 +174,20 @@ module mkUnion (BINARY_OPERATOR_IFC);
 	    ackRows.enq(outputAddrCnt);
 	    state <= UNION_IDLE;
 
-		if (currCmd.outputDest == MEMORY) begin
-			wdataMemQ.enq(-1);
-		end
-		else begin
-			wdataQ.enq(-1);
-		end
+	    case (currCmd.outputDest)
+	       MEMORY:
+	       begin
+		  wdataMemQ.enq(-1);
+	       end
+	       SELECT:
+	       begin
+		  wdataSelectQ.enq(-1);
+	       end
+	       PROJECT:
+	       begin
+		  wdataProjectQ.enq(-1);
+	       end
+	    endcase
 	    /*
 	    rowReqQ.enq(RowReq{tableAddr: currCmd.outputAddr,
 			 rowOffset: outputAddrCnt,
@@ -258,32 +277,49 @@ module mkUnion (BINARY_OPERATOR_IFC);
    endrule
    */
    rule cp_table1_wr_row if ( state == UNION_CP_TABLE1_WR_ROW );
-	   if ( wrBurstCnt < currCmd.table0numCols ) begin
-		   
-		   if (currCmd.outputDest == MEMORY) begin
-			   wdataMemQ.enq(rowBuff[wrBurstCnt]);
-		   end
-		   else begin
-			   wdataQ.enq(rowBuff[wrBurstCnt]);
-		   end
-		   wrBurstCnt <= wrBurstCnt + 1;
-	   end
-	   else begin
-		   wrBurstCnt <= 0;
-		   state <= UNION_CP_TABLE1_RD_REQ;
-	   end
+      if ( wrBurstCnt < currCmd.table0numCols ) begin
+	 case (currCmd.outputDest)
+	    MEMORY:
+	    begin
+	       wdataMemQ.enq(rowBuff[wrBurstCnt]);
+	    end
+	    SELECT:
+	    begin
+	       wdataSelectQ.enq(rowBuff[wrBurstCnt]);
+	    end
+	    PROJECT:
+	    begin
+	       wdataProjectQ.enq(rowBuff[wrBurstCnt]);
+	    end
+	 endcase
+	 wrBurstCnt <= wrBurstCnt + 1;
+      end
+      else begin
+	 wrBurstCnt <= 0;
+	 state <= UNION_CP_TABLE1_RD_REQ;
+      end
    endrule
    
 	//interface vector
    Vector#(NUM_BINARY_INTEROP_OUT, INTEROP_SERVER_IFC) interOut = newVector();
-	for (Integer ind=0; ind < valueOf(NUM_BINARY_INTEROP_OUT); ind=ind+1) begin
-	 	interOut[ind] = interface INTEROP_SERVER_IFC; 
-							method ActionValue#(RowBurst) readResp();
-								wdataQ.deq();
-								return wdataQ.first();
-							endmethod
-						endinterface;
-	end
+   for (Integer ind=0; ind < valueOf(NUM_BINARY_INTEROP_OUT); ind=ind+1) begin
+      if ( ind == 0 ) begin
+      interOut[ind] = interface INTEROP_SERVER_IFC; 
+			 method ActionValue#(RowBurst) readResp();
+			    wdataSelectQ.deq();
+			    return wdataSelectQ.first();
+			 endmethod
+		      endinterface;
+      end
+      else begin
+	 interOut[ind] = interface INTEROP_SERVER_IFC; 
+			    method ActionValue#(RowBurst) readResp();
+			       wdataProjectQ.deq();
+			       return wdataProjectQ.first();
+			    endmethod
+			 endinterface;
+      end
+   end
 	 
    
 

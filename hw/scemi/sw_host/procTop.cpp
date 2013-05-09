@@ -13,7 +13,7 @@
 //#include "procModel.h"
 
 #include "SceMiHeaders.h"
-//#include "ResetXactor.h"
+#include "ResetXactor.h"
 
 
 
@@ -35,14 +35,14 @@ int main(int argc, char* argv[]){
   ShutdownXactor shutdown("", "scemi_m_shutdown", sceMi);
 
   // Initialize the reset port.
-  //ResetXactor reset("", "scemi_m", sceMi);
+  ResetXactor reset("", "scemi_m", sceMi);
   
 
   // Service SceMi requests
   SceMiServiceThread *scemi_service_thread = new SceMiServiceThread(sceMi);
 
   // Reset the dut.
-  //reset.reset();
+  reset.reset();
 
   //sleep(5);
 
