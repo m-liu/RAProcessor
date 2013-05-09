@@ -51,6 +51,7 @@ module mkSelection (UNARY_OPERATOR_IFC);
 	FIFO#(RowAddr) ackRows <- mkFIFO;
 	FIFO#(RowReq) rowReqQ <- mkFIFO;
 	FIFO#(RowBurst) wdataQ <- mkFIFO;
+	FIFO#(RowBurst) wdataMemQ <- mkFIFO;
 	FIFO#(RowBurst) rdataQ <- mkFIFO;
 	Reg#(SelState) state <- mkReg(SEL_IDLE);
 	Reg#(Row) rowBuff <- mkReg(0);
@@ -174,7 +175,12 @@ module mkSelection (UNARY_OPERATOR_IFC);
 	rule writeRow if (state == SEL_WRITE_ROW);
 		if (rowBurstCnt < currCmd.table0numCols ) begin
 			rowBurstCnt <= rowBurstCnt + 1;
-			wdataQ.enq ( truncateLSB(rowBuff)  );
+			if (currCmd.outputDest == MEMORY) begin
+				wdataMemQ.enq ( truncateLSB(rowBuff)  );
+			end
+			else begin
+				wdataQ.enq ( truncateLSB(rowBuff)  );
+			end
 			rowBuff <= rowBuff << valueOf(BURST_WIDTH);
 		end 
 		else begin
@@ -187,7 +193,12 @@ module mkSelection (UNARY_OPERATOR_IFC);
 	rule doneTable if (state == SEL_DONE_TABLE);
 		$display("SELECT: done with table");
 		//ack, deq cmdQ, write EOT marker
-		wdataQ.enq ( -1 );
+		if (currCmd.outputDest == MEMORY) begin
+			wdataMemQ.enq ( -1 );
+		end
+		else begin
+			wdataQ.enq ( -1 );
+		end
 
 		inputAddrCnt <= 0;
 		cmdQ.deq();
@@ -219,8 +230,8 @@ module mkSelection (UNARY_OPERATOR_IFC);
 			rdataQ.enq(rData);
 		endmethod
 		method ActionValue#(RowBurst) writeData();
-			wdataQ.deq();
-			return wdataQ.first();
+			wdataMemQ.deq();
+			return wdataMemQ.first();
 		endmethod
 	endinterface 
 

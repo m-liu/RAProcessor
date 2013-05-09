@@ -21,6 +21,7 @@ module mkProjection (UNARY_OPERATOR_IFC);
    FIFO#(RowAddr) ackRows <- mkFIFO;
    FIFO#(RowReq) rowReqQ <- mkFIFO;
    FIFO#(RowBurst) wdataQ <- mkFIFO;
+   FIFO#(RowBurst) wdataMemQ <- mkFIFO;
    FIFO#(RowBurst) rdataQ <- mkFIFO;
    Reg#(ProjState) state <- mkReg(PROJ_IDLE);
    //Reg#(Row) ouputBuff <- mkReg(0);
@@ -85,14 +86,26 @@ module mkProjection (UNARY_OPERATOR_IFC);
 			//check if we're at the end
 			if (reduceAnd(rburst) == 1) begin
 				cmdQ.deq();
-				wdataQ.enq(rburst); //enq the end of table marker
+				
+				if (currCmd.outputDest == MEMORY) begin
+					wdataMemQ.enq(rburst); //enq the end of table marker
+				end
+				else begin
+					wdataQ.enq(rburst); //enq the end of table marker
+				end
+
 				ackRows.enq(rowCnt);
 				$display("PROJECT: table finished");
 				state <= PROJ_IDLE;
 			end
 			else begin
 			   if ( colProjMask[rdBurstCnt] == 1) begin
-				   wdataQ.enq(rburst);
+					if (currCmd.outputDest == MEMORY) begin
+				   		wdataMemQ.enq(rburst);
+					end
+					else begin
+				   		wdataQ.enq(rburst);
+					end
 			   //   wrBurstCnt <= wrBurstCnt+1;
 			   end
 			   if (rdBurstCnt == truncate(currCmd.table0numCols-1) )begin
@@ -146,8 +159,8 @@ module mkProjection (UNARY_OPERATOR_IFC);
 			rdataQ.enq(rData);
 		endmethod
 		method ActionValue#(RowBurst) writeData();
-			wdataQ.deq();
-			return wdataQ.first();
+			wdataMemQ.deq();
+			return wdataMemQ.first();
 		endmethod
 	endinterface 
 

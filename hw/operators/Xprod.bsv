@@ -21,6 +21,7 @@ module mkXprod (BINARY_OPERATOR_IFC);
    FIFO#(RowAddr) ackRows <- mkFIFO;
    FIFO#(RowReq) rowReqQ <- mkFIFO;
    FIFO#(RowBurst) wdataQ <- mkFIFO;
+   FIFO#(RowBurst) wdataMemQ <- mkFIFO;
    FIFO#(RowBurst) rdataQ <- mkFIFO;
    Reg#(XProdState) state <- mkReg(XPROD_IDLE);
    //Reg#(Row) ouputBuff <- mkReg(0);
@@ -109,7 +110,12 @@ module mkXprod (BINARY_OPERATOR_IFC);
 				reqType: REQ_EOT,
 				op: WRITE });
 	    */
-	    wdataQ.enq(-1);
+	   if (currCmd.outputDest == MEMORY) begin
+		   wdataMemQ.enq(-1);
+	   end
+	   else begin
+		   wdataQ.enq(-1);
+	   end
 	    $display("outer loop finishes");
 	    cmdQ.deq();
 	    ackRows.enq(total_rowCnt);
@@ -154,7 +160,12 @@ module mkXprod (BINARY_OPERATOR_IFC);
 	       
 	 
 	 $display("outer_rd[%d] = %h",table0ColCnt,rowBuff[table0ColCnt]);
-	 wdataQ.enq(rowBuff[table0ColCnt]);
+	 if (currCmd.outputDest == MEMORY) begin
+		 wdataMemQ.enq(rowBuff[table0ColCnt]);
+	 end
+	 else begin
+		 wdataQ.enq(rowBuff[table0ColCnt]);
+	 end
 	 table0ColCnt <= table0ColCnt + 1;
       end
       else begin
@@ -163,7 +174,12 @@ module mkXprod (BINARY_OPERATOR_IFC);
 	    rdataQ.deq(); 
 	    $display("rdBurst[%d] = %h",inner_rdBurstCnt,rBurst);
 	    inner_rdBurstCnt <= inner_rdBurstCnt + 1;
-	    wdataQ.enq(rBurst);
+		if (currCmd.outputDest == MEMORY) begin
+			wdataMemQ.enq(rBurst);
+		end
+		else begin
+			wdataQ.enq(rBurst);
+		end
 	 end
 	 else begin
 	    let rBurst = rdataQ.first();
@@ -202,8 +218,8 @@ module mkXprod (BINARY_OPERATOR_IFC);
 	 rdataQ.enq(rData);
       endmethod
       method ActionValue#(RowBurst) writeData();
-	 wdataQ.deq();
-	 return wdataQ.first();
+	 wdataMemQ.deq();
+	 return wdataMemQ.first();
       endmethod
    endinterface 
 

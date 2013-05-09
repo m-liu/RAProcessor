@@ -10,7 +10,7 @@ import ControllerTypes::*;
 import OperatorCommon::*;
 import RowMarshaller::*;
 
-typedef enum {IDLE, SENDCMD, WAITCMD, NEXTCMD,UPDATE_CMD_BUFF_REQ, UPDATE_CMD_BUFF_RESP, DONE} CtrlState deriving (Eq,Bits);
+typedef enum {IDLE, SENDCMD, WAITCMD, UPDATE_CMD_BUFF_REQ, UPDATE_CMD_BUFF_RESP, DONE} CtrlState deriving (Eq,Bits);
 
 
 interface RAController;
@@ -51,7 +51,7 @@ module mkRAController (RAController);
    Reg#(RowAddr) numRowsReg <- mkReg(0);
    Reg#(Index) buffUpdateCnt <- mkReg(0);
 
-   rule reqNextCmd if (cmdBuffer.init.done() && loadDone && (cnt0 < buffSize) && (state == IDLE || state == NEXTCMD));
+   rule reqNextCmd if (cmdBuffer.init.done() && loadDone && (cnt0 < buffSize) && state == IDLE);
       $display("Controller: CmdEntry %d request", cnt0);
       
       cmdBuffer.req.put(BuffReq{op: Ld,
@@ -81,7 +81,7 @@ module mkRAController (RAController);
 
 	  //keep getting cmds if the outputdest isn't memory
 	  if (cmd.outputDest != MEMORY) begin
-		  state <= NEXTCMD;
+		  state <= IDLE;
 		  $display("Controller: issuing another command at the same time");
 	  end
 	  else begin

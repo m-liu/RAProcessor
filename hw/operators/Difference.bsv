@@ -21,6 +21,7 @@ module mkDifference (BINARY_OPERATOR_IFC);
    FIFO#(RowAddr) ackRows <- mkFIFO;
    FIFO#(RowReq) rowReqQ <- mkFIFO;
    FIFO#(RowBurst) wdataQ <- mkFIFO;
+   FIFO#(RowBurst) wdataMemQ <- mkFIFO;
    FIFO#(RowBurst) rdataQ <- mkFIFO;
    Reg#(DifferenceState) state <- mkReg(DIFFERENCE_IDLE);
    //Reg#(Row) ouputBuff <- mkReg(0);
@@ -99,7 +100,12 @@ module mkDifference (BINARY_OPERATOR_IFC);
 			 reqType: REQ_EOT,
 			 op: WRITE });
 	    */
-	    wdataQ.enq(-1);
+		if (currCmd.outputDest == MEMORY) begin
+	    	wdataMemQ.enq(-1);
+		end
+		else begin
+	    	wdataQ.enq(-1);
+		end
 	 end
 	 else begin
 	    outer_rdBurstCnt <= 0;
@@ -163,14 +169,20 @@ module mkDifference (BINARY_OPERATOR_IFC);
    
    
    rule cp_table1_wr_row if ( state == DIFFERENCE_CP_TABLE0_WR_ROW );
-      if ( wrBurstCnt < currCmd.table0numCols) begin
-	 wdataQ.enq(rowBuff[wrBurstCnt]);
-	 wrBurstCnt <= wrBurstCnt + 1;
-      end
-      else begin
-	 wrBurstCnt <= 0;
-	 state <= DIFFERENCE_CP_TABLE0_RD_REQ;
-      end
+	   if ( wrBurstCnt < currCmd.table0numCols) begin
+
+		   if (currCmd.outputDest == MEMORY) begin
+			   wdataMemQ.enq(rowBuff[wrBurstCnt]);
+		   end
+		   else begin
+			   wdataQ.enq(rowBuff[wrBurstCnt]);
+		   end
+		   wrBurstCnt <= wrBurstCnt + 1;
+	   end
+	   else begin
+		   wrBurstCnt <= 0;
+		   state <= DIFFERENCE_CP_TABLE0_RD_REQ;
+	   end
    endrule
    
 	//interface vector
@@ -194,8 +206,8 @@ module mkDifference (BINARY_OPERATOR_IFC);
 			rdataQ.enq(rData);
 		endmethod
 		method ActionValue#(RowBurst) writeData();
-			wdataQ.deq();
-			return wdataQ.first();
+			wdataMemQ.deq();
+			return wdataMemQ.first();
 		endmethod
 	endinterface 
 
