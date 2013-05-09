@@ -207,6 +207,7 @@ void dumpMemory(InportProxyT<RowReq> &rowReq, OutportQueueT<RowBurst> &rdBurst){
   for (uint32_t tb_num = 0; tb_num < globalNextMeta; tb_num++){
     cout << "Table Name:\t" << globalTableMeta[tb_num].tableName;
     uint32_t nCols = globalTableMeta[tb_num].numCols;
+    uint32_t nRowsMax = globalTableMeta[tb_num].numRows+32; //for printing purposes when table is empty
     uint32_t addr_ptr = globalTableMeta[tb_num].startAddr;
     printf("\tTable Addr: %x",addr_ptr);
   
@@ -226,15 +227,17 @@ void dumpMemory(InportProxyT<RowReq> &rowReq, OutportQueueT<RowBurst> &rdBurst){
 
     uint32_t resp = 0;
     uint32_t colCnt = 0;
+	uint32_t rowCnt = 0;
     // while (true) {
-    while ( resp != 0xFFFFFFFF ){
+    while ( (resp != 0xFFFFFFFF) && (rowCnt < nRowsMax) ){
       //printf("here\n");
       //fflush(stdout);
       resp = rdBurst.getMessage();
       
       if (colCnt == nCols){
-	colCnt = 0;
-	cout << endl;
+		colCnt = 0;
+		rowCnt++;
+		cout << endl;
       }
       
       cout << resp << "\t";
@@ -242,6 +245,9 @@ void dumpMemory(InportProxyT<RowReq> &rowReq, OutportQueueT<RowBurst> &rdBurst){
     }
     
     printf("\n\n");
+	if (rowCnt == nRowsMax) {
+		printf("Note: max nrows reached, stopped printing\n");
+	}
     //printf("\none table done\n\n");
     
   }

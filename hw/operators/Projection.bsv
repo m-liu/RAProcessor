@@ -17,7 +17,7 @@ typedef enum {PROJ_IDLE, PROJ_WR_REQ, PROJ_PROCESS_ROW, PROJ_DONE_ROW} ProjState
 (* synthesize *)
 module mkProjection (UNARY_OPERATOR_IFC);
 
-   FIFO#(CmdEntry) cmdQ <- mkFIFO;
+   FIFOF#(CmdEntry) cmdQ <- mkFIFOF;
    FIFO#(RowAddr) ackRows <- mkFIFO;
    FIFO#(RowReq) rowReqQ <- mkFIFO;
    FIFO#(RowBurst) wdataQ <- mkFIFO;
@@ -34,8 +34,9 @@ module mkProjection (UNARY_OPERATOR_IFC);
    let currCmd = cmdQ.first();
 	
    rule reqRows if (state == PROJ_IDLE);
-      //$display("PROJ_IDLE");
+      $display("PROJECT: project accepted command");
 	  if (currCmd.inputSrc == MEMORY) begin
+      	$display("PROJECT: input src is MEMORY");
 		  rowReqQ.enq( RowReq{
 						tableAddr: currCmd.table0Addr,
 						rowOffset: 0,
@@ -51,14 +52,15 @@ module mkProjection (UNARY_OPERATOR_IFC);
       wrBurstCnt <= 0;
       rowCnt <= 0;
       
-      //$display("colProjMask: %b",currCmd.colProjectMask);
+      $display("PROJECT: colProjMask: %b",currCmd.colProjectMask);
       colProjMask <= currCmd.colProjectMask;
       state <= PROJ_WR_REQ;
    endrule
    
    rule write_req if (state == PROJ_WR_REQ);
-      //$display("PROJ_WR_REQ");
+      $display("PROJECT: WR_REQ");
 	  if (currCmd.outputDest == MEMORY) begin
+      		$display("PROJECT: WR REQ TO MEMORY");
       		rowReqQ.enq( RowReq{
 					tableAddr: currCmd.outputAddr,
 					rowOffset: 0,
@@ -78,12 +80,14 @@ module mkProjection (UNARY_OPERATOR_IFC);
 	 // if (rdBurstCnt < currCmd.table0numCols ) begin
 		   let rburst = rdataQ.first();
 		   rdataQ.deq();
+			$display("PROJECT: burst: %x", rburst);
 
 			//check if we're at the end
 			if (reduceAnd(rburst) == 1) begin
 				cmdQ.deq();
 				wdataQ.enq(rburst); //enq the end of table marker
 				ackRows.enq(rowCnt);
+				$display("PROJECT: table finished");
 				state <= PROJ_IDLE;
 			end
 			else begin
@@ -123,7 +127,7 @@ module mkProjection (UNARY_OPERATOR_IFC);
 	Vector#(NUM_UNARY_INTEROP_IN, INTEROP_CLIENT_IFC) interIn = newVector();
 	for (Integer ind=0; ind < valueOf(NUM_UNARY_INTEROP_IN); ind=ind+1) begin
 		interIn[ind] = 	interface INTEROP_CLIENT_IFC;
-							method Action readResp(RowBurst rData);
+							method Action readResp(RowBurst rData) if (cmdQ.notEmpty);
 								//all try to enq into rdata fifo, 
 								//but really only one is active at a time
 								rdataQ.enq(rData); 

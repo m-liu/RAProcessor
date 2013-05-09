@@ -47,7 +47,7 @@ endfunction
 (* synthesize *)
 module mkSelection (UNARY_OPERATOR_IFC);
 
-	FIFO#(CmdEntry) cmdQ <- mkFIFO;
+	FIFOF#(CmdEntry) cmdQ <- mkFIFOF;
 	FIFO#(RowAddr) ackRows <- mkFIFO;
 	FIFO#(RowReq) rowReqQ <- mkFIFO;
 	FIFO#(RowBurst) wdataQ <- mkFIFO;
@@ -201,7 +201,7 @@ module mkSelection (UNARY_OPERATOR_IFC);
 	Vector#(NUM_UNARY_INTEROP_IN, INTEROP_CLIENT_IFC) interIn = newVector();
 	for (Integer ind=0; ind < valueOf(NUM_UNARY_INTEROP_IN); ind=ind+1) begin
 		interIn[ind] = 	interface INTEROP_CLIENT_IFC;
-							method Action readResp(RowBurst rData);
+							method Action readResp(RowBurst rData) if (cmdQ.notEmpty);
 								//all try to enq into rdata fifo, 
 								//but really only one is active at a time
 								rdataQ.enq(rData); 
