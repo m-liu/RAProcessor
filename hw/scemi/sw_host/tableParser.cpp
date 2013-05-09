@@ -115,6 +115,7 @@ bool parsecsv(const char *filename, const uint32_t tb_num, const uint32_t start_
 	//globalTableMeta[tb_num].numCols = strtoul(tokens[2].c_str(),NULL,10);
 	globalTableMeta[tb_num].startAddr = start_addr;
 	numLines++;
+	globalTableMeta[tb_num].inMem = true;
       }
       break;
     case 1:
@@ -195,6 +196,7 @@ bool parsecsv(const char *filename, const uint32_t tb_num, const uint32_t start_
 */
 
 void printTable(uint32_t tb_num,  InportProxyT<RowReq> &rowReq, OutportQueueT<RowBurst> &rdBurst){
+  if ( globalTableMeta[tb_num].inMem == false) return;
   RowReq request;
   
   MemOp wr_op;

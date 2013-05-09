@@ -389,11 +389,10 @@ CmdEntry_sw parseDedup (char cmdTokens[][MAX_CHARS], int numTokens){
     cmdEntry.table0numRows = tableMeta0.numRows;
     cmdEntry.table0numCols = tableMeta0.numCols;
 
-
 	//increment global pointers
 	globalNextAddr = globalNextAddr + globalTableMeta[globalNextMeta].numRows;
 	globalNextMeta++;
-
+	
 	return cmdEntry;
 
 }

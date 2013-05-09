@@ -20,6 +20,18 @@ using namespace std;
 
 vector<uint32_t> cmdInd;
 
+void invalidateTableMeta (uint32_t addr) {
+  for (int i=0; i<MAX_TABLES; i++){
+    if ( globalTableMeta[i].startAddr == addr ){
+      globalTableMeta[i].inMem = false;
+      return;
+      //return i;
+    }
+  }
+    //	printf("ERROR: cannot find table %s in metadata\n", tableName);
+  exit (EXIT_FAILURE);
+}
+
 void print_schedule(){
 
   for ( uint32_t i = 0; i < numScheds; i++){
@@ -217,6 +229,7 @@ void loadCommands(InportProxyT<BuffInit> & cmdBuffRequest, CmdEntry_sw *cmdEntry
 	cmdEntry.m_outputDest.m_val = DataLoc::e_MEMORY;
       }
       else {
+	invalidateTableMeta(cmdEntryBuff[ind].outputAddr);
 	switch ( cmdEntryBuff[schedule[i][j+1]].op ){
 	case SELECT:
 	  cmdEntry.m_outputDest.m_val = DataLoc::e_SELECT;

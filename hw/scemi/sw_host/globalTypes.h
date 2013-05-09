@@ -27,6 +27,7 @@ struct TableMetaEntry {
     uint32_t numRows;
     uint32_t numCols;
     uint32_t startAddr;
+  bool inMem;
 };
 
 
