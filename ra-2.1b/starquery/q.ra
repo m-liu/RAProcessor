@@ -1,0 +1,28 @@
+\project_{iOrder, pos_x, pos_y, pos_z, iOrder2, pos_x2, pos_y2, pos_z2} (
+\select_{pos_x > 10 or pos_y < 15 and pos_z2 > 12 or pos_x2 <= 40} (
+
+	star1 \cross \rename_{iOrder2, mass2, pos_x2, pos_y2, pos_z2, vx2, vy2, vz2, phi2, metals2, tform2, eps2} star2
+
+)
+
+);
+
+
+\project_{iOrder, pos_x, pos_y, pos_z} (
+\select_{pos_x > 10 or pos_y < 15 and pos_z2 > 12 or pos_x2 <= 40} (
+
+	star1 \cross \rename_{iOrder2, mass2, pos_x2, pos_y2, pos_z2, vx2, vy2, vz2, phi2, metals2, tform2, eps2} star2
+
+)
+
+);
+
+
+
+\select_{pos_x > 15 and pos_y > 5} (
+	\select_{iOrder0 = iOrder}(
+		( \rename_{iOrder0}(\project_{iOrder}(star3) \diff \project_{iOrder}(star1)) )
+			\cross
+		star2
+	)
+);
