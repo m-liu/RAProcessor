@@ -69,7 +69,8 @@ CREATE TABLE star4 (
 -- .separator ","
 -- .import <path to csv> <table name> 
 .separator ","
-.import ../sw_model/input/star1.txt star1 
-.import ../sw_model/input/star2.txt star2 
-.import ../sw_model/input/star3.txt star3 
-.import ../sw_model/input/star4.txt star4 
+~/RAProcessor/hw/scemi/sim/input
+.import ../hw/scemi/sim/input/star1.txt star1 
+.import ../hw/scemi/sim/input/star2.txt star2 
+.import ../hw/scemi/sim/input/star3.txt star3 
+.import ../hw/scemi/sim/input/star4.txt star4 
