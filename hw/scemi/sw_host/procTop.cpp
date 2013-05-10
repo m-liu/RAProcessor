@@ -79,7 +79,7 @@ int main(int argc, char* argv[]){
   
   //runProcModel();
   */
-  sleep(5);
+  //sleep(5);
   //wait for ack from HW
   uint32_t nRows = getRowAck.getMessage();
   //uint32_t nRow2 = getRowAck.getMessage();
