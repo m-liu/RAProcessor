@@ -48,6 +48,9 @@ typedef struct {
 	RowAddr table1numCols;
 } CmdEntry deriving (Eq, Bits);
 
+typedef enum {CONTROLLER, SELECT, PROJECT, UNION, DIFFERENCE, XPROD, DEDUP} CycleSrc deriving (Eq,Bits);
+
+typedef Tuple2#(CycleSrc, Bit#(16)) Cycles;
 
 function Fmt showCmd(CmdEntry cmdEntry);
    Fmt ret = fshow("");

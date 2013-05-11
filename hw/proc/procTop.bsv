@@ -23,6 +23,7 @@ interface RAProcessor;
    interface BuffInitIfc cmdBuffInit;
    interface Put#(Index) loadCmdBuffSize;
    interface Get#(RowAddr) getRowAck;
+   interface Get#(Cycles) getCycles;
 endinterface
 
 (* synthesize *)
@@ -84,5 +85,6 @@ module [Module] mkRAProcessor(RAProcessor);
    interface Put loadCmdBuffSize = raController.loadBuffSize;
 
    interface Get getRowAck = raController.getRowAck;
-      
+   
+   interface Get getCycles = raController.getCycles;
 endmodule

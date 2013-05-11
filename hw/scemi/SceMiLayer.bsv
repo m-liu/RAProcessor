@@ -58,6 +58,8 @@ module [SceMiModule] mkSceMiLayer(SceMiClockPortIfc clk_port, DDR2Client ifc);
 
    Empty getRowAck <- mkGetXactor(dut.getRowAck, clk_port);
    
+   Empty getCycles <- mkGetXactor(dut.getCycles, clk_port);
+   
     Empty shutdown <- mkShutdownXactor();
 
     DDR2Client ddr2 <- mkDDR2Xactor(dut.ddr2, clk_port);

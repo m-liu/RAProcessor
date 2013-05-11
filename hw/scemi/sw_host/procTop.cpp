@@ -32,6 +32,7 @@ int main(int argc, char* argv[]){
   InportProxyT<BuffInit> cmdBuffRequest("","scemi_m_cmdBuffRequest_inport", sceMi);
   InportProxyT<Index> loadCmdBuffSize("","scemi_m_loadCmdBuffSize_inport", sceMi);
   OutportQueueT<RowAddr> getRowAck("", "scemi_m_getRowAck_outport", sceMi);
+  OutportQueueT<Cycles> getCycles("", "scemi_m_getCycles_outport", sceMi);
   ShutdownXactor shutdown("", "scemi_m_shutdown", sceMi);
 
   // Initialize the reset port.
@@ -83,8 +84,19 @@ int main(int argc, char* argv[]){
   //wait for ack from HW
   uint32_t nRows = getRowAck.getMessage();
   //uint32_t nRow2 = getRowAck.getMessage();
-  printf("Hardware ack received: nRows=%d", nRows);
+
+
   
+  printf("Hardware ack received: nRows=%d", nRows);
+
+  //fflush(stdout);
+  
+
+  Cycles nCycles = getCycles.getMessage();
+  uint32_t cycles = nCycles.m_tpl_2;
+
+  printf("\nTotal number of cycles: nCycles=%d", cycles);
+  //fflush(stdout);
   /*
   printf("command dump AFTER execution:\n");
   for (uint32_t i=0; i<globalNCmds; i++){
