@@ -92,10 +92,7 @@ int main(int argc, char* argv[]){
   //fflush(stdout);
   
 
-  Cycles nCycles = getCycles.getMessage();
-  uint32_t cycles = nCycles.m_tpl_2;
 
-  printf("\nTotal number of cycles: nCycles=%d", cycles);
   //fflush(stdout);
   /*
   printf("command dump AFTER execution:\n");
@@ -122,6 +119,11 @@ int main(int argc, char* argv[]){
     printTable(i);
   }
   */
+
+  Cycles nCycles = getCycles.getMessage();
+  uint64_t cycles = nCycles.m_tpl_2;
+
+  printf("\nTotal number of cycles: nCycles = %ld\n", cycles);
 
   /****Shutting down SceMi****/
   shutdown.blocking_send_finish();
