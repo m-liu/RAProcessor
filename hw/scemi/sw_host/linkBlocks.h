@@ -13,7 +13,7 @@
 
 
 void scheduleCmds();
-void loadCommands(InportProxyT<BuffInit> & cmdBuffRequest, CmdEntry_sw *cmdEntryBuff);
+void loadCommands(InportProxyT<BuffInit> & cmdBuffRequest, CmdEntry_sw *cmdEntryBuff, bool byPass);
 
 //void dumpCmdEntry(CmdEntry cmdEntry);
 //void dumpTableMetas();

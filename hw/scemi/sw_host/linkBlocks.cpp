@@ -186,7 +186,7 @@ void handle_clause(CmdEntry &cmdEntry, CmdEntry_sw const &cmdEntry_sw, uint32_t 
 
 
 /******load commands on to fpga BRAM thru SceMi*******/
-void loadCommands(InportProxyT<BuffInit> & cmdBuffRequest, CmdEntry_sw *cmdEntryBuff){
+void loadCommands(InportProxyT<BuffInit> & cmdBuffRequest, CmdEntry_sw *cmdEntryBuff, bool byPass){
   BuffInit msg;
   
   BuffInitLoad msg_ld;
@@ -199,58 +199,65 @@ void loadCommands(InportProxyT<BuffInit> & cmdBuffRequest, CmdEntry_sw *cmdEntry
     for ( uint32_t j = 0; j < schedule[i].size(); j++ ){
       uint32_t ind = schedule[i][j];
       //printf("loading cmdEntry %d\n",ind);
-      if ( j == 0 ) {
-	cmdEntry.m_inputSrc.m_val = DataLoc::e_MEMORY;
-      }
-      else {
-	switch ( cmdEntryBuff[schedule[i][j-1]].op ){
-	case SELECT:
-	  cmdEntry.m_inputSrc.m_val = DataLoc::e_SELECT;
+      if (byPass){
+	if ( j == 0 ) {
+	  cmdEntry.m_inputSrc.m_val = DataLoc::e_MEMORY;
+	}
+	else {
+	  switch ( cmdEntryBuff[schedule[i][j-1]].op ){
+	  case SELECT:
+	    cmdEntry.m_inputSrc.m_val = DataLoc::e_SELECT;
+	    break;
+	  case PROJECT:
+	    cmdEntry.m_inputSrc.m_val = DataLoc::e_PROJECT;
 	  break;
-	case PROJECT:
-	  cmdEntry.m_inputSrc.m_val = DataLoc::e_PROJECT;
-	  break;
-	case UNION:
-	  cmdEntry.m_inputSrc.m_val = DataLoc::e_UNION;
-	  break;
-	case DIFFERENCE:
+	  case UNION:
+	    cmdEntry.m_inputSrc.m_val = DataLoc::e_UNION;
+	    break;
+	  case DIFFERENCE:
 	  cmdEntry.m_inputSrc.m_val = DataLoc::e_DIFFERENCE;
 	  break;
-	case XPROD:
-	  cmdEntry.m_inputSrc.m_val = DataLoc::e_XPROD;
-	  break;
-	case DEDUP:
-	  cmdEntry.m_inputSrc.m_val = DataLoc::e_DEDUP;
-	  break;
+	  case XPROD:
+	    cmdEntry.m_inputSrc.m_val = DataLoc::e_XPROD;
+	    break;
+	  case DEDUP:
+	    cmdEntry.m_inputSrc.m_val = DataLoc::e_DEDUP;
+	    break;
+	  }
 	}
-      }
       
-      if ( j == schedule[i].size() - 1 ) {
+	if ( j == schedule[i].size() - 1 ) {
 	cmdEntry.m_outputDest.m_val = DataLoc::e_MEMORY;
-      }
-      else {
-	invalidateTableMeta(cmdEntryBuff[ind].outputAddr);
-	switch ( cmdEntryBuff[schedule[i][j+1]].op ){
+	}
+	else {
+	  invalidateTableMeta(cmdEntryBuff[ind].outputAddr);
+	  switch ( cmdEntryBuff[schedule[i][j+1]].op ){
 	case SELECT:
 	  cmdEntry.m_outputDest.m_val = DataLoc::e_SELECT;
 	  break;
-	case PROJECT:
-	  cmdEntry.m_outputDest.m_val = DataLoc::e_PROJECT;
+	  case PROJECT:
+	    cmdEntry.m_outputDest.m_val = DataLoc::e_PROJECT;
 	  break;
-	case UNION:
-	  cmdEntry.m_outputDest.m_val = DataLoc::e_UNION;
+	  case UNION:
+	    cmdEntry.m_outputDest.m_val = DataLoc::e_UNION;
 	  break;
-	case DIFFERENCE:
-	  cmdEntry.m_outputDest.m_val = DataLoc::e_DIFFERENCE;
+	  case DIFFERENCE:
+	    cmdEntry.m_outputDest.m_val = DataLoc::e_DIFFERENCE;
+	    break;
+	  case XPROD:
+	    cmdEntry.m_outputDest.m_val = DataLoc::e_XPROD;
 	  break;
-	case XPROD:
-	  cmdEntry.m_outputDest.m_val = DataLoc::e_XPROD;
-	  break;
-	case DEDUP:
-	  cmdEntry.m_outputDest.m_val = DataLoc::e_DEDUP;
-	  break;
+	  case DEDUP:
+	    cmdEntry.m_outputDest.m_val = DataLoc::e_DEDUP;
+	    break;
+	  }
 	}
       }
+      else{
+	cmdEntry.m_inputSrc.m_val = DataLoc::e_MEMORY;
+	cmdEntry.m_outputDest.m_val = DataLoc::e_MEMORY;
+      }
+
 
       
       CmdEntry_sw cmdEntry_sw = cmdEntryBuff[ind];

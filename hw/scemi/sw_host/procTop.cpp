@@ -14,6 +14,7 @@
 
 #include "SceMiHeaders.h"
 //#include "ResetXactor.h"
+#define FPGA_CLK 50e6
 
 
 
@@ -64,10 +65,31 @@ int main(int argc, char* argv[]){
     printf("\nCSV files Read Successful, Memory Initialized!...........\n\n");
   }
 
+  char bypass_c;
+  bool bypass_b;
+  
+  while(true){
+    printf("Enable Passing Between Blocks?(y/n): ");
+    scanf("%s", &bypass_c);
+    if ( bypass_c == 'y' || bypass_c == 'Y' ){
+      bypass_b = true;
+      printf("\nPassing Between Blocks Enabled!\n");
+      break;
+    }
+    else if ( bypass_c == 'n' || bypass_c == 'N') {
+      bypass_b = false;
+      printf("\nPassing Between Blocks Disabled!\n");
+      break;
+    }
+    else{
+      printf("\nPlease enter y/n(Y/n)");
+    }
+  }
+    
   
   globalNCmds = genCommand(cmdIn, globalCmdEntryBuff);
   scheduleCmds();
-  loadCommands(cmdBuffRequest, globalCmdEntryBuff);
+  loadCommands(cmdBuffRequest, globalCmdEntryBuff, bypass_b);
 
   //printf("num of commands: %d", globalNCmds);
   loadCmdBuffSize.sendMessage(globalNCmds);
@@ -120,11 +142,38 @@ int main(int argc, char* argv[]){
   }
   */
 
+  printf("\n***********************************\n");
+  printf("Printing Benchmark Counter\n");
   Cycles nCycles = getCycles.getMessage();
   uint64_t cycles = nCycles.m_tpl_2;
 
-  printf("\nTotal number of cycles: nCycles = %ld\n", cycles);
-
+  
+  switch ( nCycles.m_tpl_1.m_val ){
+  case CycleSrc::e_CONTROLLER:
+    printf("Controller: %ld cycles or %e seconds\n", cycles, (double)cycles/FPGA_CLK);
+    break;
+  case CycleSrc::e_SELECT:
+    printf("Select: %ld cycles or %e seconds\n", cycles, (double)cycles/FPGA_CLK);
+    break;
+  case CycleSrc::e_PROJECT:
+    printf("Project: %ld cycles or %e seconds\n", cycles, (double)cycles/FPGA_CLK);
+    break;
+  case CycleSrc::e_UNION:
+    printf("Union: %ld cycles or %e seconds\n", cycles, (double)cycles/FPGA_CLK);
+    break;
+  case CycleSrc::e_DIFFERENCE:
+    printf("Difference: %ld cycles or %e seconds\n", cycles, (double)cycles/FPGA_CLK);
+    break;
+  case CycleSrc::e_XPROD:
+    printf("Xprod: %ld cycles or %e seconds\n", cycles, (double)cycles/FPGA_CLK);
+    break;
+  case CycleSrc::e_DEDUP:
+    printf("Dedup: %ld cycles or %e seconds\n", cycles, (double)cycles/FPGA_CLK);
+    break;
+  default:
+    break;
+  }
+  
   /****Shutting down SceMi****/
   shutdown.blocking_send_finish();
   scemi_service_thread->stop();
