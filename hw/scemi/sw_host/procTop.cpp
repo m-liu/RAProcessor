@@ -64,28 +64,23 @@ int main(int argc, char* argv[]){
   else{
     printf("\nCSV files Read Successful, Memory Initialized!...........\n\n");
   }
+  fflush(stdout);
 
-  char bypass_c;
   bool bypass_b;
   
-  while(true){
-    printf("Enable Passing Between Blocks?(y/n): ");
-    scanf("%s", &bypass_c);
-    if ( bypass_c == 'y' || bypass_c == 'Y' ){
-      bypass_b = true;
-      printf("\nPassing Between Blocks Enabled!\n");
-      break;
-    }
-    else if ( bypass_c == 'n' || bypass_c == 'N') {
+    //printf("Enable Passing Between Blocks?(y/n): ");
+    //scanf("%s", &bypass_c);
+	
+    if ( argc==3 ) {
       bypass_b = false;
       printf("\nPassing Between Blocks Disabled!\n");
-      break;
     }
-    else{
-      printf("\nPlease enter y/n(Y/n)");
+    else {
+      bypass_b = true;
+      printf("\nPassing Between Blocks Enabled!\n");
     }
-  }
     
+  fflush(stdout);
   
   globalNCmds = genCommand(cmdIn, globalCmdEntryBuff);
   scheduleCmds();
@@ -111,8 +106,8 @@ int main(int argc, char* argv[]){
   
   printf("Hardware ack received: nRows=%d", nRows);
 
-  //fflush(stdout);
   
+  fflush(stdout);
 
 
   //fflush(stdout);
@@ -141,39 +136,51 @@ int main(int argc, char* argv[]){
     printTable(i);
   }
   */
+  fflush(stdout);
 
   printf("\n***********************************\n");
+    if ( !bypass_b ) {
+      printf("\nPassing Between Blocks Disabled!\n");
+    }
+    else {
+      printf("\nPassing Between Blocks Enabled!\n");
+    }
+    
   printf("Printing Benchmark Counter\n");
-  Cycles nCycles = getCycles.getMessage();
-  uint64_t cycles = nCycles.m_tpl_2;
 
+  for(int i=0; i < globalNCmds+1; i++) {
+	  Cycles nCycles = getCycles.getMessage();
+	  uint64_t cycles = nCycles.m_tpl_2;
+
+	  
+	  switch ( nCycles.m_tpl_1.m_val ){
+	  case CycleSrc::e_CONTROLLER:
+		printf("Controller: %ld cycles or %e seconds\n", cycles, (double)cycles/FPGA_CLK);
+		break;
+	  case CycleSrc::e_SELECT:
+		printf("Select: %ld cycles or %e seconds\n", cycles, (double)cycles/FPGA_CLK);
+		break;
+	  case CycleSrc::e_PROJECT:
+		printf("Project: %ld cycles or %e seconds\n", cycles, (double)cycles/FPGA_CLK);
+		break;
+	  case CycleSrc::e_UNION:
+		printf("Union: %ld cycles or %e seconds\n", cycles, (double)cycles/FPGA_CLK);
+		break;
+	  case CycleSrc::e_DIFFERENCE:
+		printf("Difference: %ld cycles or %e seconds\n", cycles, (double)cycles/FPGA_CLK);
+		break;
+	  case CycleSrc::e_XPROD:
+		printf("Xprod: %ld cycles or %e seconds\n", cycles, (double)cycles/FPGA_CLK);
+		break;
+	  case CycleSrc::e_DEDUP:
+		printf("Dedup: %ld cycles or %e seconds\n", cycles, (double)cycles/FPGA_CLK);
+		break;
+	  default:
+		break;
+	  }
   
-  switch ( nCycles.m_tpl_1.m_val ){
-  case CycleSrc::e_CONTROLLER:
-    printf("Controller: %ld cycles or %e seconds\n", cycles, (double)cycles/FPGA_CLK);
-    break;
-  case CycleSrc::e_SELECT:
-    printf("Select: %ld cycles or %e seconds\n", cycles, (double)cycles/FPGA_CLK);
-    break;
-  case CycleSrc::e_PROJECT:
-    printf("Project: %ld cycles or %e seconds\n", cycles, (double)cycles/FPGA_CLK);
-    break;
-  case CycleSrc::e_UNION:
-    printf("Union: %ld cycles or %e seconds\n", cycles, (double)cycles/FPGA_CLK);
-    break;
-  case CycleSrc::e_DIFFERENCE:
-    printf("Difference: %ld cycles or %e seconds\n", cycles, (double)cycles/FPGA_CLK);
-    break;
-  case CycleSrc::e_XPROD:
-    printf("Xprod: %ld cycles or %e seconds\n", cycles, (double)cycles/FPGA_CLK);
-    break;
-  case CycleSrc::e_DEDUP:
-    printf("Dedup: %ld cycles or %e seconds\n", cycles, (double)cycles/FPGA_CLK);
-    break;
-  default:
-    break;
-  }
-  
+  	  fflush(stdout);
+	}
   /****Shutting down SceMi****/
   shutdown.blocking_send_finish();
   scemi_service_thread->stop();
